@@ -21,6 +21,8 @@ printf '%s' 'YOUR_KEY' > ~/.config/marginalia/api_key
 chmod 600 ~/.config/marginalia/api_key
 ```
 
+If `MARGINALIA_BASE_URL` is set, the scripts call that endpoint instead (a local key proxy that adds the real key); the key can then be a dummy. See the README.
+
 Without a key the script falls back to the shared `public` key, which works for trying things out but is heavily rate-limited (503 when exhausted) and cannot manage filters.
 
 **A free non-commercial key allows 1000 queries/day, HARD limit** (set `MARGINALIA_QUOTA_LIMIT` if yours differs). The script prints a `marginalia quota: N/1000 queries today` line to stderr after each call (local ledger at `${XDG_STATE_HOME:-~/.local/state}/marginalia/usage.jsonl`; disable with `MARGINALIA_LEDGER=off`). The ledger only counts calls made through the script — raw curl bypasses it, so treat the count as a floor. "Today" is the UTC day, matching the quota window.

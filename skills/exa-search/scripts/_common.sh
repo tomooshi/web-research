@@ -1,5 +1,8 @@
 # shared by exa scripts: key loading, request, ledger. Source, don't execute.
 
+# EXA_BASE_URL points the scripts at a local key proxy (see README).
+EXA_BASE="${EXA_BASE_URL:-https://api.exa.ai}"
+
 exa_key() {
 	API_KEY="${EXA_API_KEY:-}"
 	if [ -z "$API_KEY" ] && [ -r "$HOME/.config/exa/api_key" ]; then
@@ -19,7 +22,7 @@ exa_post() {
 		-H "x-api-key: $API_KEY" \
 		-H "Content-Type: application/json" \
 		-d "$body" \
-		"https://api.exa.ai/$endpoint")"
+		"${EXA_BASE%/}/$endpoint")"
 	http_code="$(echo "$response" | tail -n1)"
 	body_out="$(echo "$response" | sed '$d')"
 	if [ "$http_code" != "200" ]; then

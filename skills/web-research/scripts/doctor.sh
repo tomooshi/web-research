@@ -64,6 +64,14 @@ none) warn "marginalia: no key — falling back to the shared, heavily rate-limi
 *) ok "marginalia ($m)" ;;
 esac
 
+# Custom endpoints (e.g. a local key proxy). Only shown when overridden.
+for v in KAGI_BASE_URL EXA_BASE_URL MARGINALIA_BASE_URL; do
+	if [ -n "${!v:-}" ]; then
+		[ -z "${_EP_HDR:-}" ] && { echo "Custom endpoints"; _EP_HDR=1; }
+		ok "$v=${!v}"
+	fi
+done
+
 echo "Optional fetch-page.sh extras (free fallback rungs)"
 if "$PY" -c "import bs4" 2>/dev/null; then
 	ok "beautifulsoup4 ($PY) — enables curl / playwright / camoufox / wayback rungs"

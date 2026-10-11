@@ -50,6 +50,10 @@ shift $((OPTIND - 1))
 
 QUERY="${1:?Usage: search.sh [options] \"query\"}"
 
+# MARGINALIA_BASE_URL points the script at a local key proxy (see README).
+MARGINALIA_BASE="${MARGINALIA_BASE_URL:-https://api2.marginalia-search.com}"
+MARGINALIA_BASE="${MARGINALIA_BASE%/}"
+
 API_KEY="${MARGINALIA_API_KEY:-}"
 if [ -z "$API_KEY" ] && [ -r "$HOME/.config/marginalia/api_key" ]; then
 	API_KEY="$(cat "$HOME/.config/marginalia/api_key")"
@@ -70,7 +74,7 @@ ARGS=(--get --data-urlencode "query=$QUERY")
 RESPONSE="$(curl -s -w "\n%{http_code}" \
 	-H "API-Key: $API_KEY" \
 	"${ARGS[@]}" \
-	"https://api2.marginalia-search.com/search")"
+	"$MARGINALIA_BASE/search")"
 
 HTTP_CODE="$(echo "$RESPONSE" | tail -n1)"
 BODY_OUT="$(echo "$RESPONSE" | sed '$d')"

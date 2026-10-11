@@ -42,6 +42,10 @@ if [ "$#" -lt 1 ]; then
 	exit 2
 fi
 
+# KAGI_BASE_URL points the script at a local key proxy (see README).
+KAGI_BASE="${KAGI_BASE_URL:-https://kagi.com/api/v1}"
+KAGI_BASE="${KAGI_BASE%/}"
+
 API_KEY="${KAGI_API_KEY:-}"
 if [ -z "$API_KEY" ] && [ -r "$HOME/.config/kagi/api_key" ]; then
 	API_KEY="$(cat "$HOME/.config/kagi/api_key")"
@@ -67,7 +71,7 @@ RESPONSE="$(curl -s -w "\n%{http_code}" \
 	-H "Authorization: Bearer $API_KEY" \
 	-H "Content-Type: application/json" \
 	-d "$BODY" \
-	"https://kagi.com/api/v1/extract")"
+	"$KAGI_BASE/extract")"
 
 HTTP_CODE="$(echo "$RESPONSE" | tail -n1)"
 BODY_OUT="$(echo "$RESPONSE" | sed '$d')"

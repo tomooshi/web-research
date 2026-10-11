@@ -19,6 +19,8 @@ printf '%s' 'YOUR_KEY' > ~/.config/exa/api_key
 chmod 600 ~/.config/exa/api_key
 ```
 
+If `EXA_BASE_URL` is set, the scripts call that endpoint instead (a local key proxy that adds the real key); the key can then be a dummy. See the README.
+
 Requires `bash`, `curl`, `python3` (stdlib only).
 
 ## The one habit that matters

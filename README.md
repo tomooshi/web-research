@@ -90,6 +90,18 @@ printf '%s' 'MARGINALIA_KEY' > ~/.config/marginalia/api_key
 chmod 600 ~/.config/{kagi,exa,marginalia}/api_key
 ```
 
+### Keeping keys away from the agent (optional)
+
+Key files and env vars are readable by any agent that can run these scripts. If you'd rather the agent never see the keys, run a local proxy that holds them and adds the auth header, then point the scripts at it and give them a dummy key:
+
+```bash
+export KAGI_BASE_URL=http://127.0.0.1:8811/api/v1      KAGI_API_KEY=dummy
+export EXA_BASE_URL=http://127.0.0.1:8812              EXA_API_KEY=dummy
+export MARGINALIA_BASE_URL=http://127.0.0.1:8813       MARGINALIA_API_KEY=dummy
+```
+
+The proxy must drop the client's auth header and add the real one: `Authorization: Bearer` (Kagi), `x-api-key` (Exa), `API-Key` (Marginalia). The ledgers and quota lines work unchanged.
+
 Without a Marginalia key, the scripts use Marginalia's shared `public` key. That's enough to try things out, but it runs out quickly. Kagi and Exa have no fallback. If you skip one of them, leave it out of the fan-out: `meta-search.sh -e marginalia,exa "query"`.
 
 ## Check the setup
@@ -136,6 +148,7 @@ ${XDG_STATE_HOME:-~/.local/state}/marginalia/usage.jsonl
 | Variable | Effect |
 |---|---|
 | `KAGI_API_KEY`, `EXA_API_KEY`, `MARGINALIA_API_KEY` | API keys (override the key files) |
+| `KAGI_BASE_URL`, `EXA_BASE_URL`, `MARGINALIA_BASE_URL` | API endpoint, e.g. a local key proxy (defaults: `https://kagi.com/api/v1`, `https://api.exa.ai`, `https://api2.marginalia-search.com`) |
 | `KAGI_LEDGER`, `EXA_LEDGER`, `MARGINALIA_LEDGER` | ledger path, or `off` |
 | `KAGI_RATE_SEARCH`, `KAGI_RATE_EXTRACT` | Kagi prices used by the ledger (defaults: 0.012 / 0.004) |
 | `MARGINALIA_QUOTA_LIMIT` | daily Marginalia quota (default 1000) |

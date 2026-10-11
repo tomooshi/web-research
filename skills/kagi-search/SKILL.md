@@ -20,6 +20,8 @@ chmod 600 ~/.config/kagi/api_key
 # OR export KAGI_API_KEY=YOUR_KEY in your shell profile
 ```
 
+If `KAGI_BASE_URL` is set, the scripts call that endpoint instead (a local key proxy that adds the real key); the key can then be a dummy. See the README.
+
 Requires `bash`, `curl`, `python3` (stdlib only).
 
 ## Usage

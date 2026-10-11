@@ -37,7 +37,9 @@ if [ -z "$API_KEY" ]; then
 	exit 1
 fi
 
-BASE="https://api2.marginalia-search.com/filter"
+# MARGINALIA_BASE_URL points the script at a local key proxy (see README).
+MARGINALIA_BASE="${MARGINALIA_BASE_URL:-https://api2.marginalia-search.com}"
+BASE="${MARGINALIA_BASE%/}/filter"
 
 call() {
 	local method="$1" url="$2"; shift 2

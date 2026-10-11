@@ -64,6 +64,10 @@ QUERY="${1:?Usage: search-v1.sh [options] \"query\" [extract_count]}"
 # Positional extract_count only if -n not given.
 if [ -z "$EXTRACT_COUNT" ]; then EXTRACT_COUNT="${2:-0}"; fi
 
+# KAGI_BASE_URL points the script at a local key proxy (see README).
+KAGI_BASE="${KAGI_BASE_URL:-https://kagi.com/api/v1}"
+KAGI_BASE="${KAGI_BASE%/}"
+
 API_KEY="${KAGI_API_KEY:-}"
 if [ -z "$API_KEY" ] && [ -r "$HOME/.config/kagi/api_key" ]; then
 	API_KEY="$(cat "$HOME/.config/kagi/api_key")"
@@ -105,7 +109,7 @@ RESPONSE="$(curl -s -w "\n%{http_code}" \
 	-H "Authorization: Bearer $API_KEY" \
 	-H "Content-Type: application/json" \
 	-d "$BODY" \
-	"https://kagi.com/api/v1/search")"
+	"$KAGI_BASE/search")"
 
 HTTP_CODE="$(echo "$RESPONSE" | tail -n1)"
 BODY_OUT="$(echo "$RESPONSE" | sed '$d')"
