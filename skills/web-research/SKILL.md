@@ -7,7 +7,15 @@ description: "Coordinate four search engines for multi-source web research: Kagi
 
 This skill sits **above** four engine skills and coordinates them. The engine skills are **sibling folders** of this one (`../kagi-search`, `../marginalia-search`, `../exa-search`, `../deepseek-search`); all `./scripts/...` paths below are relative to this skill's own directory.
 
-**First run:** `./scripts/doctor.sh` checks tools, API keys, engine selection and optional extras (no network calls; add `--live` for one real query per usable engine). If a key is missing, the fix is in that engine's SKILL.md → Setup. Every engine is optional.
+**First run:** `./scripts/doctor.sh` checks tools, API keys, engine selection and optional extras (no network calls; add `--live` for one real query per usable engine). Every engine is optional.
+
+**Engines that are not configured (read this before you mention keys to the operator):**
+
+1. An engine without a key is a choice the operator made, not a fault. `meta-search.sh` and `fetch-page.sh` skip it on their own, without errors.
+2. Before you call an engine skill directly, check that it is configured: `./scripts/engines.sh`, or the `engines` field of any `meta-search.sh` result. If it is not configured, use the fallback in **Routing → If an engine is not configured**.
+3. If an engine script exits **3** or prints `not configured`, skip that engine for the rest of the session. Do not retry it.
+4. **Do not ask the operator for a key, and do not suggest getting one.** Mention a missing engine only when the operator asks about setup or names that engine, or once, as a plain fact, when it blocks the task (example: only Kagi renders X/Twitter posts well).
+5. Never treat a `skipped: not configured` entry or a `–` line in `doctor.sh` as something to fix.
 
 
 - **kagi-search** (`../kagi-search/`) — lexical + quality re-ranking (hybrid index: own + upstream commercial), $0.012/search + $0.004/extract, operator precision (site:/filetype:), news workflows, X/Twitter extraction.
@@ -62,11 +70,13 @@ Env vars override the file for one run: `WEB_RESEARCH_ENGINES`, `WEB_RESEARCH_DE
 |---|---|
 | No `default` set | `kagi,marginalia`, minus unusable engines, filled up to two from `kagi, marginalia, deepseek, exa` |
 | `-e all` | every usable engine |
-| `-e kagi,exa` with no Kagi key | Exa runs; `engines.kagi = "skipped: no key"` |
-| Engine disabled in `engines` | aliases skip it silently; naming it with `-e` reports `skipped: disabled in config` |
-| Marginalia without a key | runs through the shared public key (rate-limited) when named with `-e`; aliases use it only when no engine with a real key is usable |
+| Aliases (`default`, `all`, `cheap`) | run only configured engines; engines without a key, not installed or disabled are left out **silently** |
+| Alias with no configured engine (e.g. `-e cheap` without Marginalia and DeepSeek keys) | runs the automatic default set instead and adds a `note` field to the output |
+| `-e kagi,exa` with no Kagi key | Exa runs; `engines.kagi = "skipped: not configured"`. Named engines are reported, because the caller asked for them |
+| Marginalia without a key | runs through the shared public key (rate-limited) when named with `-e`; aliases use it only when no engine with a real key is usable. When the public key is busy, Marginalia is skipped for the task |
 | fetch-page.sh default ladder | paid rungs without a usable engine drop out silently; with `-m` they appear in `attempts` as `skipped: <reason>` |
 | No usable engine | stderr says so, exit 1 |
+| Engine script called directly without a key | one-line `not configured` message on stderr, **exit 3** |
 | Unknown engine name | exit 2 with the list of known names |
 
 The `search-cost` footer follows the same rule: it shows the engines in `engines`, else every engine with a key or ledger history.
@@ -178,6 +188,18 @@ Fan-out is not the default. It spends several budgets, so route first. First que
 | Contested claim, need independent corroboration | **Fan-out `-e all`** |
 | Tight loop (query expansion, evals, many candidate queries) | **`-e cheap`** (Marginalia free + DeepSeek $0.00075), or Marginalia direct; one full fan-out on the winner. Respect DeepSeek's 5 QPS |
 
+### If an engine is not configured
+
+Route to the next configured engine. Do not ask for the missing key.
+
+| Missing engine | Use instead |
+|---|---|
+| **Kagi** | quick facts and `site:`/quoted queries → DeepSeek direct (with `-o`) or Exa `-t instant`; news → Exa `-c news` or DeepSeek `after:`; page extraction → `fetch-page.sh` (exa/deepseek/free rungs); X/Twitter posts → `fetch-page.sh` free rungs (weak: say once that results may be thin) |
+| **Exa** | conceptual queries → DeepSeek direct with `-o "<the goal>"`, or Kagi with a keyword rephrase; find-similar → search a one-sentence description of the page; papers → Kagi `lens_id: academic` or `site:arxiv.org` |
+| **Marginalia** | indie/old web → Kagi `lens_id: small web`, or Exa `-c "personal site"`; free loops → DeepSeek (`$0.00075`) |
+| **DeepSeek** | Chinese sources → Kagi with a Chinese-language query; date bounds → Kagi `filters.after`/`before` or Exa `-a`/`-b`; cheap loops → Marginalia |
+| **only one engine configured** | use it for everything; `meta-search.sh` still works (one engine, no agreement signal) |
+
 ## Workflow recipes
 
 ### Breadth-then-depth (default research pattern)
@@ -231,7 +253,7 @@ Extract figures assume the exa rung succeeds. Without an Exa key, each extract f
 - **Exa 402 (credits exhausted)** — continue without Exa; `fetch-page.sh` skips a failing exa rung. Credits reset monthly.
 - **Exa contents stale** — the rung already refetches cache older than 168 h, and the slug guard catches some younger stale copies. Otherwise run `contents.sh -l URL` (`maxAgeHours=0`, fresh fetch) or fall to the kagi rung.
 - **DeepSeek 402 (balance)** — top up, or continue without it (`-e kagi,marginalia,exa`, or drop it from `engines` in the config). **429** — the script retries twice. Above 5 QPS across all agents, slow the loop.
-- **DeepSeek skipped (no key / query >128 chars)** — expected states, not failures. Shorten the query to include DeepSeek.
+- **Engine skipped (not configured, or DeepSeek query >128 chars)** — expected states, not failures. Do not report them as problems. Shorten the query to include DeepSeek.
 - **Any extract fails on a specific URL** — use `fetch-page.sh`; it walks every rung automatically.
 - **Kagi down entirely** — Marginalia + Exa + DeepSeek still cover discovery; DeepSeek/Exa + free rungs cover extraction. Only news workflows and X/Twitter rendering are lost.
 - **All engines down** — stop and report. Do not silently answer from training data when the user asked for research.

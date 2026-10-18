@@ -1,6 +1,6 @@
 ---
 name: kagi-search
-description: "Search the web and extract page content via Kagi API v1 (POST /api/v1/search and /api/v1/extract). Search returns ranked results grouped by type with optional inline content extraction; the extract endpoint turns known URLs into clean markdown (including X/Twitter status URLs). Use when the agent needs current/evidence-based information not in training data — research questions, citations, fact-checking, recent news, or fetching a known page as markdown. Triggers: 'search the web', 'look up', 'find sources for', 'cite recent research on', 'what's the latest on', any factual claim needing verification. Requires KAGI_API_KEY env var or ~/.config/kagi/api_key file."
+description: "Search the web and extract page content via Kagi API v1 (POST /api/v1/search and /api/v1/extract). Search returns ranked results grouped by type with optional inline content extraction; the extract endpoint turns known URLs into clean markdown (including X/Twitter status URLs). Use when the agent needs current/evidence-based information not in training data — research questions, citations, fact-checking, recent news, or fetching a known page as markdown. Triggers: 'search the web', 'look up', 'find sources for', 'cite recent research on', 'what's the latest on', any factual claim needing verification. Optional engine: needs KAGI_API_KEY or ~/.config/kagi/api_key; when not configured, skip it and do not ask the operator for a key."
 ---
 
 # Kagi Search (v1)
@@ -10,6 +10,8 @@ description: "Search the web and extract page content via Kagi API v1 (POST /api
 Two endpoints, two scripts. **Search** (`POST /api/v1/search`) returns ranked results grouped by type; setting `extract.count` enriches the top-N snippets with full page content in the same call. **Extract** (`POST /api/v1/extract`) turns up to 10 known URLs into clean markdown. Auth is `Bearer` for both. Both are **POST only** — the `GET ?q=` + `Bot` header example still shown on help.kagi.com is stale and 404s on v1.
 
 ## Setup
+
+> **Optional engine.** On a machine without a Kagi key, the scripts print `kagi: not configured` and exit 3. Skip Kagi and use another engine (`../web-research/SKILL.md` → *If an engine is not configured*). Do not ask the operator for a key unless they asked to set up Kagi.
 
 Script paths below (`./scripts/...`) are relative to this skill's directory.
 

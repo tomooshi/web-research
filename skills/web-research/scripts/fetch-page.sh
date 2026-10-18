@@ -110,7 +110,7 @@ is_x_url() {
 try_deepseek() {
 	is_x_url && { note_failure deepseek "skipped for X/Twitter (kagi renders tweets)"; return 1; }
 	if [ -z "${DEEPSEEK_API_KEY:-}" ] && [ ! -r "$HOME/.config/deepseek/api_key" ]; then
-		note_failure deepseek "skipped: no key configured"; return 1
+		note_failure deepseek "skipped: not configured"; return 1
 	fi
 	[ -f "$DS_SCRIPTS/fetch.sh" ] || { note_failure deepseek "deepseek-search skill not found at $DS_SCRIPTS"; return 1; }
 	if ! DEEPSEEK_TIMEOUT="$TIMEOUT" bash "$DS_SCRIPTS/fetch.sh" "$URL" >"$TMPD/ds.json" 2>"$TMPD/ds.err"; then

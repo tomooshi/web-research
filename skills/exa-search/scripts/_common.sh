@@ -6,8 +6,9 @@ exa_key() {
 		API_KEY="$(cat "$HOME/.config/exa/api_key")"
 	fi
 	if [ -z "$API_KEY" ]; then
-		echo "Error: no EXA_API_KEY env var and no ~/.config/exa/api_key file" >&2
-		exit 1
+		# exit 3 = not configured (web-research treats it as "skip this engine")
+		echo "exa: not configured on this machine (no EXA_API_KEY or ~/.config/exa/api_key). Skip this engine and use another one; do not ask the operator for a key unless they asked to set up Exa." >&2
+		exit 3
 	fi
 }
 

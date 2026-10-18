@@ -108,7 +108,7 @@ def state():
         if not inst:
             reason = "skill not installed"
         elif not src:
-            reason = "no key"
+            reason = "not configured"
         elif not allowed:
             reason = "disabled in config"
         rows[name] = {"installed": inst, "key": src, "enabled": allowed, "usable": reason is None,
@@ -120,26 +120,32 @@ def state():
     if "default" in cfg:
         default, configured_default = cfg["default"], True
     else:
-        default = [e for e in BUILTIN_DEFAULT if e in keyed]
-        for e in FILL_ORDER:
-            if len(default) >= 2:
-                break
-            if e in keyed and e not in default:
-                default.append(e)
-        configured_default = False
+        default, configured_default = auto_default(keyed), False
     return cfg, rows, keyed, default, configured_default
+
+
+def auto_default(keyed):
+    """kagi,marginalia minus unusable engines, filled up to two from FILL_ORDER."""
+    default = [e for e in BUILTIN_DEFAULT if e in keyed]
+    for e in FILL_ORDER:
+        if len(default) >= 2:
+            break
+        if e in keyed and e not in default:
+            default.append(e)
+    return default
 
 
 def resolve(spec):
     cfg, rows, usable, default, configured_default = state()
     spec = ALIASES.get(spec.strip().lower(), spec.strip().lower())
-    skip = {}
+    skip, note = {}, None
+    alias = spec in ("default", "all", "cheap")
     if spec == "default":
         wanted = default
     elif spec == "all":
         wanted = usable
     elif spec == "cheap":
-        wanted = ["marginalia", "deepseek"]
+        wanted = [e for e in ("marginalia", "deepseek") if e in usable]
     else:
         wanted = parse_list(spec)
         bad = [e for e in wanted if e not in ENGINES]
@@ -150,10 +156,20 @@ def resolve(spec):
     for e in wanted:
         if rows[e]["usable"]:
             run.append(e)
-        elif rows[e]["reason"] != "disabled in config" or spec not in ("default", "all", "cheap"):
-            # Silent only when an alias meets an engine the user turned off on purpose.
+        elif not alias:
+            # Only engines the caller named are reported. Aliases drop engines
+            # that are not configured, not installed or disabled, silently:
+            # the operator chose not to set them up.
             skip[e] = rows[e]["reason"]
-    return {"run": run, "skip": skip}
+    if alias and not run and usable:
+        # e.g. -e cheap without Marginalia/DeepSeek, or a configured default
+        # whose engines have no key on this machine: use the automatic set.
+        run = auto_default(usable)
+        note = f"-e {spec}: none of its engines is configured here; ran {', '.join(run)} instead"
+    out = {"run": run, "skip": skip}
+    if note:
+        out["note"] = note
+    return out
 
 
 def ladder(methods):

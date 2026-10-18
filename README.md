@@ -103,6 +103,8 @@ chmod 600 ~/.config/exa/api_key
 
 Without a Marginalia key, an explicit `-e marginalia` uses Marginalia's shared `public` key. That is enough to try things out, but it runs out quickly. The other engines have no fallback: without a key they are skipped.
 
+**Missing keys are not errors.** An engine without a key is *not configured*: the fan-out and the fetch ladder leave it out without a message, an engine script called directly prints one `not configured` line and exits 3, `doctor.sh` lists it with a neutral `–`, and the cost footer hides it. The skills tell the agent to use the next configured engine and **not** to ask you for keys you chose not to add.
+
 ## Choose engines
 
 With no setup, every engine that has a key is used. The plain `meta-search.sh "query"` call runs Kagi + Marginalia, or the first two usable engines if you lack one of them. `-e all` runs every usable engine.
@@ -144,7 +146,7 @@ Or ask your agent something like *"research what practitioners say about X, find
 
 If you'd rather have your agent set this up and adapt it, paste this:
 
-> Install the skills from https://github.com/tomooshi/web-research for this harness (read its README). Then run `skills/web-research/scripts/doctor.sh` and walk me through anything marked ✗ or !: API keys for the engines I want, missing tools. Don't put keys in the repo. Use `~/.config/<engine>/api_key` with chmod 600. If a script path doesn't resolve in this harness, fix it so the five skill folders stay side by side, and don't hardcode my home directory.
+> Install the skills from https://github.com/tomooshi/web-research for this harness (read its README). Then run `skills/web-research/scripts/doctor.sh`. Fix anything marked ✗. Ask me **once** which of the four engines I want, and help me add keys only for those. Treat the others as not configured and don't bring them up again. Don't put keys in the repo. Use `~/.config/<engine>/api_key` with chmod 600. If a script path doesn't resolve in this harness, fix it so the five skill folders stay side by side, and don't hardcode my home directory.
 
 ## Cost tracking
 

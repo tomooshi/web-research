@@ -33,8 +33,8 @@ if [ -z "$API_KEY" ] && [ -r "$HOME/.config/marginalia/api_key" ]; then
 	API_KEY="$(cat "$HOME/.config/marginalia/api_key")"
 fi
 if [ -z "$API_KEY" ]; then
-	echo "Error: filter management needs a real key (MARGINALIA_API_KEY or ~/.config/marginalia/api_key)" >&2
-	exit 1
+	echo "marginalia filters: not available without a personal key (MARGINALIA_API_KEY or ~/.config/marginalia/api_key). Skip this optional step; do not ask the operator for a key unless they asked to set up Marginalia." >&2
+	exit 3
 fi
 
 BASE="https://api2.marginalia-search.com/filter"

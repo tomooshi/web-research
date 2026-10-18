@@ -103,6 +103,9 @@ files = {"kagi": "kagi", "marginalia": "marg", "exa": "exa", "deepseek": "ds"}
 for e, why in r["skip"].items():  # reported as "skipped: <why>"
     with open(os.path.join(os.environ["TMPD"], files[e] + ".skip"), "w") as f:
         f.write(why)
+if r.get("note"):
+    with open(os.path.join(os.environ["TMPD"], "note"), "w") as f:
+        f.write(r["note"])
 print(",".join(r["run"]))')"
 [ -n "$RUN" ] || echo "meta-search: no usable engine for -e '$ENGINE' (see scripts/engines.sh)" >&2
 
@@ -324,8 +327,15 @@ results = sorted((merged[k] for k in order),
                  key=lambda r: (-r["score"], -len(r["sources"])))
 overlap = sum(1 for r in results if len(r["sources"]) > 1)
 
+note = None
+try:
+    with open(os.path.join(tmpd, "note")) as f:
+        note = f.read().strip()
+except OSError:
+    pass
 print(json.dumps({
     "query": os.environ["QUERY"],
+    **({"note": note} if note else {}),
     "engines": engines,
     "cost": cost,
     "overlap": overlap,

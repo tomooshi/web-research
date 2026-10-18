@@ -1,6 +1,6 @@
 ---
 name: deepseek-search
-description: "Web search and page fetch via the DeepSeek Search & Fetch API (POST api.deepseek.com/v1/tools/search and /v1/tools/fetch), DeepSeek's in-house index. Cheapest paid engine in the stack: $0.00075 per search or fetch, and empty results, errors and timeouts are not billed. Each result carries a query-focused 600-800 char summary written for models, a rerank_score (0-3) and an authority tier (0-4). Supports site:/-site:/quoted/lang:/after:/before: operators. Verified live 2026-10-18; results are passages with synthetic URL fragments and locale copies, which web-research's meta-search merges. Use for cheap search loops with quality signals, Chinese-language sources (lang:zh), date-bounded queries, and as the cheapest fetch rung for known URLs (live, but flat text: no links or code fences, so Exa/Kagi rank above it in fetch-page.sh). Prefer kagi-search for news workflows and X/Twitter, exa-search for conceptual/neural queries and find-similar, marginalia-search for indie/old web. Requires DEEPSEEK_API_KEY or ~/.config/deepseek/api_key."
+description: "Web search and page fetch via the DeepSeek Search & Fetch API (POST api.deepseek.com/v1/tools/search and /v1/tools/fetch), DeepSeek's in-house index. Cheapest paid engine in the stack: $0.00075 per search or fetch, and empty results, errors and timeouts are not billed. Each result carries a query-focused 600-800 char summary written for models, a rerank_score (0-3) and an authority tier (0-4). Supports site:/-site:/quoted/lang:/after:/before: operators. Verified live 2026-10-18; results are passages with synthetic URL fragments and locale copies, which web-research's meta-search merges. Use for cheap search loops with quality signals, Chinese-language sources (lang:zh), date-bounded queries, and as the cheapest fetch rung for known URLs (live, but flat text: no links or code fences, so Exa/Kagi rank above it in fetch-page.sh). Prefer kagi-search for news workflows and X/Twitter, exa-search for conceptual/neural queries and find-similar, marginalia-search for indie/old web. Optional engine: needs DEEPSEEK_API_KEY or ~/.config/deepseek/api_key; when not configured, skip it and do not ask the operator for a key."
 ---
 
 # DeepSeek Search & Fetch
@@ -17,6 +17,8 @@ Billed only on HTTP 200 **with** a result (search: non-empty `results`; fetch: n
 > **Verified live 2026-10-18** (key in `~/.config/deepseek/api_key`). Search, fetch, operators, billing and the ledger work. Real output differs from the docs in several ways; see **Live behavior** below. Search quality for English technical queries is below Kagi's (results lean to package registries and localized doc copies). It is strong for Chinese sources, date-bounded queries and as a cheap extra vote.
 
 ## Setup
+
+> **Optional engine.** On a machine without a DeepSeek key, the scripts print `deepseek: not configured` and exit 3. Skip DeepSeek and use another engine (`../web-research/SKILL.md` → *If an engine is not configured*). Do not ask the operator for a key unless they asked to set up DeepSeek.
 
 1. Create a key at platform.deepseek.com (the chat-API key works; same bearer auth).
 2. `mkdir -p ~/.config/deepseek && printf '%s' "$KEY" > ~/.config/deepseek/api_key && chmod 600 ~/.config/deepseek/api_key` (or export `DEEPSEEK_API_KEY`).

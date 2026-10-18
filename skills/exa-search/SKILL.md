@@ -1,6 +1,6 @@
 ---
 name: exa-search
-description: "Neural/semantic web search via the Exa API (api.exa.ai) — retrieval by meaning (custom-trained embeddings over Exa's own crawl), not keywords. THE engine for conceptual queries ('essays arguing X', 'companies building Y'), publication/company/people category search, query-relevant highlights (free inside search), similarity expansion (find-similar.sh — deprecated by Exa but still working), and cheap page extraction (contents.sh, $0.001/page, 4x cheaper than Kagi extract, maxAgeHours freshness control). Use when the query describes what the answer looks like rather than what words it contains, when expanding from a known-good source, or for 'papers about', 'startups similar to', 'personal sites discussing'. Prefer kagi-search for operator-precision (site:/filetype:), news workflows, X/Twitter; marginalia-search for indie/old-web; deepseek-search for the cheapest search/fetch. Requires EXA_API_KEY or ~/.config/exa/api_key. Free tier: $10 credits/month."
+description: "Neural/semantic web search via the Exa API (api.exa.ai) — retrieval by meaning (custom-trained embeddings over Exa's own crawl), not keywords. THE engine for conceptual queries ('essays arguing X', 'companies building Y'), publication/company/people category search, query-relevant highlights (free inside search), similarity expansion (find-similar.sh — deprecated by Exa but still working), and cheap page extraction (contents.sh, $0.001/page, 4x cheaper than Kagi extract, maxAgeHours freshness control). Use when the query describes what the answer looks like rather than what words it contains, when expanding from a known-good source, or for 'papers about', 'startups similar to', 'personal sites discussing'. Prefer kagi-search for operator-precision (site:/filetype:), news workflows, X/Twitter; marginalia-search for indie/old-web; deepseek-search for the cheapest search/fetch. Optional engine: needs EXA_API_KEY or ~/.config/exa/api_key (free tier $10 credits/month); when not configured, skip it and do not ask the operator for a key."
 ---
 
 # Exa Search (neural)
@@ -10,6 +10,8 @@ Exa runs its own crawler, its own index, and retrieval by **custom-trained trans
 Docs moved to `exa.ai/docs` (index: `exa.ai/docs/llms.txt`; every page has a `.md` variant).
 
 ## Setup
+
+> **Optional engine.** On a machine without a Exa key, the scripts print `exa: not configured` and exit 3. Skip Exa and use another engine (`../web-research/SKILL.md` → *If an engine is not configured*). Do not ask the operator for a key unless they asked to set up Exa.
 
 Script paths below (`./scripts/...`) are relative to this skill's directory.
 

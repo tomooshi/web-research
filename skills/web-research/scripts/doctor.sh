@@ -27,6 +27,7 @@ LIVE=""
 
 FAIL=0
 ok() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
+off() { printf '  \033[2m–\033[0m %s\n' "$1"; }  # optional, not set up: not a problem
 warn() { printf '  \033[33m!\033[0m %s\n' "$1"; }
 bad() { printf '  \033[31m✗\033[0m %s\n' "$1"; FAIL=1; }
 
@@ -39,7 +40,7 @@ command -v python3 >/dev/null 2>&1 || { echo; echo "Not ready — install python
 echo "Skills (in $SKILLS_ROOT)"
 if [ -f "$SKILLS_ROOT/web-research/SKILL.md" ]; then ok "web-research"; else bad "web-research missing (set SEARCH_SKILLS_DIR?)"; fi
 for s in kagi-search marginalia-search exa-search deepseek-search; do
-	if [ -f "$SKILLS_ROOT/$s/SKILL.md" ]; then ok "$s"; else warn "$s missing — that engine is unavailable (keep the skill folders side by side, or set SEARCH_SKILLS_DIR)"; fi
+	if [ -f "$SKILLS_ROOT/$s/SKILL.md" ]; then ok "$s"; else off "$s not installed (optional; skipped)"; fi
 done
 
 echo "API keys and engine selection"
@@ -49,6 +50,7 @@ if [ -n "$STATUS" ]; then
 	while IFS=$'\t' read -r level msg; do
 		case "$level" in
 		ok) ok "$msg" ;;
+		off) off "$msg" ;;
 		warn) warn "$msg" ;;
 		info) echo "    $msg" ;;
 		esac
@@ -61,14 +63,15 @@ signup = {"kagi": "https://kagi.com/api", "exa": "https://dashboard.exa.ai",
 for name, r in d["engines"].items():
     if r["usable"]:
         if r.get("public"):
-            print("warn\t" + f"{name}: no key, using the shared public key (heavily rate-limited)  → {signup[name]}")
+            print("off\t" + f"{name}: no personal key, uses the shared public key (rate-limited; optional free key: {signup[name]})")
         else:
             src = r["key"]
             print("ok\t" + f"{name} ({src})")
-    elif r["reason"] == "no key":
-        print("warn\t" + f"{name}: no key, engine skipped  → {signup[name]}")
+    elif r["reason"] == "not configured":
+        print("off\t" + f"{name}: not configured (optional; key from {signup[name]})")
     else:
-        print("warn\t" + f"{name}: {r['reason']}, engine skipped")
+        why = r["reason"]
+        print("off\t" + f"{name}: {why} (optional)")
 print("info\t" + "default fan-out: " + (", ".join(d["default"]) or "none"))
 print("info\t" + "fetch ladder: " + " -> ".join(d["ladder"]))
 cfg = d["config"] if d["config_present"] else d["config"] + " (absent: every engine with a key is used)"
@@ -128,7 +131,7 @@ fi
 
 echo
 if [ "$FAIL" = 0 ]; then
-	echo "Ready. Usable engines: ${USABLE//,/, }"
+	echo "Ready. Usable engines: ${USABLE//,/, }. Engines marked – are optional and are skipped without errors."
 else
 	echo "Not ready — fix the ✗ items above."
 fi

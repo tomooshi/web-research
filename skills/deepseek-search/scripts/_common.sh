@@ -16,8 +16,9 @@ ds_key() {
 		API_KEY="$(tr -d '[:space:]' <"$HOME/.config/deepseek/api_key")"
 	fi
 	if [ -z "$API_KEY" ]; then
-		echo "Error: no DEEPSEEK_API_KEY env var and no ~/.config/deepseek/api_key file" >&2
-		exit 1
+		# exit 3 = not configured (web-research treats it as "skip this engine")
+		echo "deepseek: not configured on this machine (no DEEPSEEK_API_KEY or ~/.config/deepseek/api_key). Skip this engine and use another one; do not ask the operator for a key unless they asked to set up DeepSeek." >&2
+		exit 3
 	fi
 }
 

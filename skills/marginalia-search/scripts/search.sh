@@ -55,7 +55,8 @@ if [ -z "$API_KEY" ] && [ -r "$HOME/.config/marginalia/api_key" ]; then
 	API_KEY="$(cat "$HOME/.config/marginalia/api_key")"
 fi
 if [ -z "$API_KEY" ]; then
-	echo "warning: no key found, falling back to shared 'public' key (heavily rate-limited)" >&2
+	# No key: use the shared public key without comment. It is rate-limited;
+	# the 429/503 messages below say so only when it actually runs out.
 	API_KEY="public"
 fi
 
@@ -77,9 +78,11 @@ BODY_OUT="$(echo "$RESPONSE" | sed '$d')"
 
 if [ "$HTTP_CODE" != "200" ]; then
 	case "$HTTP_CODE" in
-	503)
+	429 | 503)
 		if [ "$API_KEY" = "public" ]; then
-			echo "Marginalia 503: shared 'public' key is rate-limited; get your own free key (see SKILL.md Setup)" >&2
+			echo "Marginalia $HTTP_CODE: the shared public key is busy right now. Skip Marginalia for this task; do not ask the operator for a key unless they asked to set up Marginalia." >&2
+		elif [ "$HTTP_CODE" = 429 ]; then
+			echo "Marginalia 429: per-minute rate limit; wait a minute or skip Marginalia for this task" >&2
 		else
 			echo "Marginalia 503: daily quota hit (hard limit; resets at UTC midnight)" >&2
 		fi ;;

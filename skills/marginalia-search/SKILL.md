@@ -1,6 +1,6 @@
 ---
 name: marginalia-search
-description: "Search the non-commercial, indie, and old web via the Marginalia Search API (GET api2.marginalia-search.com/search, API-Key header). Surfaces personal blogs, forums, academic pages, retro/niche sites, and text-heavy low-javascript pages that mainstream engines bury under SEO spam. FREE (1000 queries/day hard limit) — use it as the zero-cost first pass or alongside kagi-search: Marginalia to discover obscure/indie/old-web sources, Kagi for mainstream coverage and full-page extraction. Triggers: 'search the small web', 'indie web', 'old web', 'find blogs about', 'non-commercial sources', 'obscure pages on', 'retro', searching topics where SEO spam drowns signal (recipes, hobbies, DIY, niche tech), or any research task where kagi-search is also in play. Requires MARGINALIA_API_KEY env var or ~/.config/marginalia/api_key file (falls back to shared 'public' key)."
+description: "Search the non-commercial, indie, and old web via the Marginalia Search API (GET api2.marginalia-search.com/search, API-Key header). Surfaces personal blogs, forums, academic pages, retro/niche sites, and text-heavy low-javascript pages that mainstream engines bury under SEO spam. FREE (1000 queries/day hard limit) — use it as the zero-cost first pass or alongside kagi-search: Marginalia to discover obscure/indie/old-web sources, Kagi for mainstream coverage and full-page extraction. Triggers: 'search the small web', 'indie web', 'old web', 'find blogs about', 'non-commercial sources', 'obscure pages on', 'retro', searching topics where SEO spam drowns signal (recipes, hobbies, DIY, niche tech), or any research task where kagi-search is also in play. Uses MARGINALIA_API_KEY or ~/.config/marginalia/api_key, else the shared public key (rate-limited); never ask the operator for a key unless they asked to set up Marginalia."
 ---
 
 # Marginalia Search
@@ -10,6 +10,8 @@ One endpoint, one script. `GET https://api2.marginalia-search.com/search?query=.
 Everything below verified against the live API on **2026-09-01**.
 
 ## Setup
+
+> **Optional key.** Without a personal key the scripts use Marginalia's shared public key, with no warning. If that key is busy (HTTP 429/503), skip Marginalia for the task. Do not ask the operator for a key unless they asked to set up Marginalia.
 
 Script paths below (`./scripts/...`) are relative to this skill's directory.
 

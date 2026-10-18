@@ -71,8 +71,9 @@ if [ -z "$API_KEY" ] && [ -r "$HOME/.config/kagi/api_key" ]; then
 	API_KEY="$(cat "$HOME/.config/kagi/api_key")"
 fi
 if [ -z "$API_KEY" ]; then
-	echo "Error: no KAGI_API_KEY env var and no $HOME/.config/kagi/api_key file" >&2
-	exit 1
+	# exit 3 = not configured (web-research treats it as "skip this engine")
+	echo "kagi: not configured on this machine (no KAGI_API_KEY or ~/.config/kagi/api_key). Skip this engine and use another one; do not ask the operator for a key unless they asked to set up Kagi." >&2
+	exit 3
 fi
 
 BODY="$(QUERY="$QUERY" WORKFLOW="$WORKFLOW" LIMIT="$LIMIT" PAGE="$PAGE" \
