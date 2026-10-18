@@ -1,17 +1,17 @@
 {
-  "name": "search-three",
+  "name": "web-research",
   "owner": {
     "name": "tomooshi"
   },
   "metadata": {
-    "description": "Kagi + Exa + Marginalia web-research skills for coding agents."
+    "description": "Four-engine web-research skills for coding agents (Kagi, Marginalia, Exa, DeepSeek)."
   },
   "plugins": [
     {
-      "name": "search-three",
+      "name": "web-research",
       "source": "./",
-      "description": "Kagi + Exa + Marginalia web-research skills: multi-engine fan-out with cross-engine agreement, and a page-extraction fallback ladder.",
-      "version": "0.1.0",
+      "description": "Four-engine web research skills for coding agents (Kagi, Marginalia, Exa, DeepSeek; use any subset): parallel fan-out with rank fusion and cross-engine agreement, and a page-extraction fallback ladder.",
+      "version": "0.2.0",
       "category": "productivity"
     }
   ]

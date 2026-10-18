@@ -25,6 +25,8 @@ set -euo pipefail
 #                    advanced params: lens_id, filters, safe_search, format,
 #                    timeout, extract.timeout.
 #
+# NOTE: `personalizations` (domain block/lower/raise/pin, regexes) is fully
+# specified but also ignored by the live API (re-verified 2026-10-18).
 # NOTE: the inline `lens` object is documented in the OpenAPI spec but is
 # silently IGNORED by the live API (verified 2026-08-10). Use search operators
 # (site:, filetype:) or `lens_id` instead. `filters.region` must be lowercase;
@@ -92,8 +94,11 @@ if extra:
         raise SystemExit("-j must be a JSON object (e.g. '{\"limit\":5}')")
     body.update(merge)
 if "lens" in body:
-    print("warning: inline `lens` is ignored by the live Kagi API; "
+    print("warning: inline `lens` is ignored by the live Kagi API (re-verified 2026-10-18); "
           "use site:/filetype: operators or lens_id", file=sys.stderr)
+if "personalizations" in body:
+    print("warning: `personalizations` is ignored by the live Kagi API (re-verified 2026-10-18); "
+          "use -site: operators, or set up/downranks on the Kagi account", file=sys.stderr)
 f = body.get("filters")
 if isinstance(f, dict) and isinstance(f.get("region"), str):
     f["region"] = f["region"].lower()   # API rejects uppercase codes with 400

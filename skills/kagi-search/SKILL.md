@@ -5,6 +5,8 @@ description: "Search the web and extract page content via Kagi API v1 (POST /api
 
 # Kagi Search (v1)
 
+> API surface re-audited **2026-10-18** against `kagi.com/api/docs/_spec/openapi.yaml` and the changelog: v1 is still Search + Extract only, request/response schemas match this document, prices unchanged. The API has been in public preview since 2026-05-21.
+
 Two endpoints, two scripts. **Search** (`POST /api/v1/search`) returns ranked results grouped by type; setting `extract.count` enriches the top-N snippets with full page content in the same call. **Extract** (`POST /api/v1/extract`) turns up to 10 known URLs into clean markdown. Auth is `Bearer` for both. Both are **POST only** — the `GET ?q=` + `Bot` header example still shown on help.kagi.com is stale and 404s on v1.
 
 ## Setup
@@ -87,7 +89,7 @@ Gotchas verified against the live API:
 | Param | Values | Status |
 |---|---|---|
 | `workflow` | `search`/`images`/`videos`/`news`/`podcasts` | ✅ works (shortcut `-w`) |
-| `limit` | 1..1024 | ✅ caps results returned (shortcut `-l`) |
+| `limit` | 1..1024 | ✅ caps results **per result group** (shortcut `-l`). `-l 20` returned 17 `search` + 9 `interesting_finds` + 1 `infobox` (2026-10-18) |
 | `page` | 1..10 | ✅ pagination (shortcut `-p`) |
 | `filters` | `{region, after, before}` | ✅ works — **`region` must be lowercase** |
 | `extract` | `{count: 1..10, timeout: 0.5..4}` | ✅ works (shortcut `-n` / 2nd positional) |
@@ -95,8 +97,8 @@ Gotchas verified against the live API:
 | `timeout` | 0.5..4 seconds | ✅ lower = faster/rougher |
 | `safe_search` | bool (default true) | omits NSFW content |
 | `format` | `json`/`markdown` | ⚠️ experimental — **returns `text/markdown`, not JSON** |
-| `lens` (inline object) | object | ❌ **silently ignored by the live API (verified 2026-08-10)** |
-| `personalizations` | object | ❌ silently ignored in testing; account-level up/downranks do apply |
+| `lens` (inline object) | object | ❌ **silently ignored by the live API (verified 2026-08-10, re-verified 2026-10-18)** |
+| `personalizations` | object | ❌ **silently ignored** (re-verified 2026-10-18: `domains:[{domain:"wikipedia.org",kind:"block"}]` returned the same 3 Wikipedia hits as the baseline). The spec now fully documents `domains` (`block`/`lower`/`raise`/`pin`) and `regexes`; the script warns. Account-level up/downranks do apply |
 
 **⚠️ The inline `lens` object does not work.** It is fully documented in the OpenAPI spec (`sites_included`, `sites_excluded`, `keywords_included`, `keywords_excluded`, `file_type`, `time_after`, `time_before`, `time_relative`, `search_region`) but the live API accepts and ignores it — `sites_excluded: ["arxiv.org"]` still returns arxiv, `sites_included: ["reddit.com"]` returns zero reddit. **Use search operators instead**, which do work:
 
@@ -106,7 +108,7 @@ Gotchas verified against the live API:
 ./scripts/search-v1.sh -j '{"lens_id":"academic"}' "climate change"  # ✅
 ```
 
-Working built-in `lens_id` values (verified): `programming`, `academic`, `forums`, `pdf`, `wikipedia`, `recipes`, `shopping`, `small web`. A bogus `lens_id` is silently ignored, so sanity-check the domains you get back. **Snaps** also work inline (`@r headphones` biases to Reddit) but they soft-bias rather than hard-scope — non-Reddit results still leak in past the top few. Use `site:reddit.com` when you need a hard filter.
+Working built-in `lens_id` values (verified): `programming`, `academic`, `forums`, `pdf`, `wikipedia`, `recipes`, `shopping`, `small web`, plus `fediverse` (Lemmy/Mastodon results) and `usenet_archive` (Usenet archives) verified 2026-10-18. Kagi's 2026-09-10 changelog added bangs for the built-in lenses (`!forums`, `!fediverse`, `!programming`, `!small_web`, `!academic`, `!usenet_archive`). A bogus `lens_id` is silently ignored, so sanity-check the domains you get back. **Snaps** also work inline (`@r headphones` biases to Reddit) but they soft-bias rather than hard-scope — non-Reddit results still leak in past the top few. Use `site:reddit.com` when you need a hard filter.
 
 **`filters.region` is lowercase ISO-3166-1 alpha-2.** `"us"`, `"de"`, `"gb"`, `"jp"` ✅. `"US"`/`"DE"` → HTTP 400 `search.filters_region_invalid`. `no_region` is accepted. (The `help.kagi.com/api/regions` list the error points at is still a 404.)
 
@@ -125,11 +127,12 @@ Working built-in `lens_id` values (verified): `programming`, `academic`, `forums
 - Per-URL failures come back inline as `data[i].error` with **HTTP 200** — always check for it. A non-HTTPS URL is not rejected up front; it just fails to crawl.
 - Malformed requests (e.g. 11 URLs) return HTTP 400 with a top-level `errors` array. Note the live key is **`errors` (plural)** even though the spec's shared error envelope says `error`.
 - **Extraction preserves links** from the source document (shipped 2026-06-16), so extracted markdown is usable for crawl/follow flows.
+- Kagi's changelog (2026-08-21) lists a fix for "Extract API returns empty `data` for an entire batch when one page times out". Before that fix, one slow URL could blank a 10-URL batch. Not re-tested live.
 - Prefer this over a scraping stack whenever the target isn't behind a login/anti-bot wall.
 
 ## Cost
 
-Published rates (kagi.com/api/pricing, checked 2026-08-10):
+Published rates (kagi.com/api/pricing, checked 2026-08-10, unchanged 2026-10-18):
 
 | | Rate | Per call |
 |---|---|---|
@@ -146,15 +149,16 @@ Both scripts append one JSON record per successful call to `${XDG_STATE_HOME:-~/
 {"ts":"2026-08-13T21:49:36Z","ep":"search","searches":1,"pages":2,"usd":0.02,"trace":"...","q":"what is rag"}
 ```
 
-Rates come from `KAGI_RATE_SEARCH` / `KAGI_RATE_EXTRACT` if Kagi changes pricing. To see spend for all three engines: `../web-research/scripts/search-cost.sh`. (In pi, the bundled `search-cost` extension also renders a live footer and a `/search-cost` command.)
+Rates come from `KAGI_RATE_SEARCH` / `KAGI_RATE_EXTRACT` if Kagi changes pricing. To see spend for every engine: `../web-research/scripts/search-cost.sh`. (In pi, the bundled `search-cost` extension also renders a live footer, `⌕ kagi $0.12 · exa $0.03 · ds $0.004 · marg 19/1k`, and a `/search-cost` command.)
 
 The ledger counts every call made through these scripts (agent, your own shell, other sessions). It **cannot** see calls made via Kagi's hosted MCP server, which bypasses them — treat the portal as the source of truth for billing.
 
 ## Related skills
 
 - **marginalia-search** (`../marginalia-search/`) — free indie/old-web engine (1000 queries/day). Prefer it for blog/forum/old-web discovery and SEO-spam-prone topics; it costs nothing.
-- **exa-search** (`../exa-search/`) — neural/semantic engine ($0.007/search, $10 free monthly credits). Prefer it for conceptual queries, find-similar expansion, and cheap extraction ($0.001/page vs Kagi's $0.004 — but Kagi extract still owns X/Twitter).
-- **web-research** (`../web-research/`) — coordinator: parallel Kagi + Marginalia (+ Exa) fan-out with cross-engine overlap detection, plus `fetch-page.sh`, an extraction fallback ladder (exa → kagi → curl → playwright → camoufox → wayback). Prefer it for open-ended research, and reach for `fetch-page.sh` whenever `extract-v1.sh` returns a per-URL error.
+- **exa-search** (`../exa-search/`) — neural/semantic engine ($0.007/search, $0.004 with `-t instant`, $10 free monthly credits). Prefer it for conceptual queries, find-similar expansion, and cheap extraction ($0.001/page vs Kagi's $0.004 — but Kagi extract still owns X/Twitter).
+- **deepseek-search** (`../deepseek-search/`) — cheapest paid engine ($0.00075/search or fetch, empty results free). Prefer it for Chinese sources (`lang:zh`), date-bounded queries and cheap loops; its fetch is live but flat text (no links).
+- **web-research** (`../web-research/`) — coordinator: parallel four-engine fan-out (Kagi, Marginalia, Exa, DeepSeek) with canonical dedupe and rank fusion, plus `fetch-page.sh`, an extraction fallback ladder (exa → deepseek → kagi → curl → playwright → camoufox → wayback); every engine optional. Prefer it for open-ended research, and reach for `fetch-page.sh` whenever `extract-v1.sh` returns a per-URL error.
 
 ## Decision Tree: search-only vs. search+extract
 
@@ -241,4 +245,4 @@ Error bodies are `{"meta": {...}, "data": null, "errors": [{"code", "url", "mess
 - **429 Rate limit** — back off; per-account rate limits and usage caps apply. No rate-limit headers are exposed.
 - **5xx** — Kagi-side; retry once after 2 sec, then surface the error with the `trace` value.
 
-Acknowledgement: structure adapted from an earlier kagi-search v0 skill (joelazar style). Params, response shapes, pricing, lens behavior, and X coverage re-verified against the v1 OpenAPI spec and the live API on **2026-08-10**.
+Acknowledgement: structure adapted from an earlier kagi-search v0 skill (joelazar style). Params, response shapes, pricing, lens behavior, and X coverage re-verified against the v1 OpenAPI spec and the live API on **2026-08-10**. Re-audited 2026-10-18 (spec diff, changelog, live tests of `lens`, `personalizations`, new `lens_id`s).

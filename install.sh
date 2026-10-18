@@ -1,10 +1,10 @@
 #!/bin/bash
-# install.sh — install the four skills into an agent's skills directory.
+# install.sh — install the five skills into an agent's skills directory.
 #
 # Only needed if you are NOT using a plugin/package manager:
-#   Claude Code:  /plugin marketplace add tomooshi/search-three
-#                 /plugin install search-three@search-three
-#   pi:           pi install git:github.com/tomooshi/search-three
+#   Claude Code:  /plugin marketplace add tomooshi/web-research
+#                 /plugin install web-research@web-research
+#   pi:           pi install git:github.com/tomooshi/web-research
 #
 # Usage:
 #   ./install.sh [--copy] [--force] TARGET
@@ -20,13 +20,14 @@
 # --copy   copy instead of symlinking
 # --force  replace existing skills with the same names
 #
-# The four skills must stay side by side in the same directory — web-research
-# calls the engine skills' scripts through ../<skill>/scripts.
+# The five skills must stay side by side in the same directory — web-research
+# calls the engine skills' scripts through ../<skill>/scripts. Engines whose
+# API key is missing are skipped at run time, so installing all five is safe.
 
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILLS=(web-research kagi-search exa-search marginalia-search)
+SKILLS=(web-research kagi-search exa-search marginalia-search deepseek-search)
 MODE=link
 FORCE=""
 
@@ -77,5 +78,5 @@ done
 
 echo
 echo "Installed to $DEST. Next:"
-echo "  1. Add API keys (see README → API keys)"
+echo "  1. Add API keys for the engines you want (see README → API keys)"
 echo "  2. Check setup: $DEST/web-research/scripts/doctor.sh"

@@ -25,7 +25,7 @@ Without a key the script falls back to the shared `public` key, which works for 
 
 **A free non-commercial key allows 1000 queries/day, HARD limit** (set `MARGINALIA_QUOTA_LIMIT` if yours differs). The script prints a `marginalia quota: N/1000 queries today` line to stderr after each call (local ledger at `${XDG_STATE_HOME:-~/.local/state}/marginalia/usage.jsonl`; disable with `MARGINALIA_LEDGER=off`). The ledger only counts calls made through the script — raw curl bypasses it, so treat the count as a floor. "Today" is the UTC day, matching the quota window.
 
-`../web-research/scripts/search-cost.sh` shows today's count alongside Kagi/Exa spend (in pi, the bundled `search-cost` extension also shows `marg used/1k` in the footer, amber at 80%, red at 95%).
+`../web-research/scripts/search-cost.sh` shows today's count alongside the paid engines' spend (in pi, the bundled `search-cost` extension also shows `marg used/1k` in the footer, amber at 80%, red at 95%).
 
 Requires `bash`, `curl`, `python3` (stdlib only).
 
@@ -106,7 +106,7 @@ Full XML element reference is in the header comment of `scripts/filter.sh`: `dom
 
 ## When to use Marginalia vs. Kagi
 
-For multi-source research, prefer the **web-research** skill (`../web-research/`) — its `meta-search.sh` fans out to Kagi + Marginalia (+ Exa with `-e all`) in parallel, dedupes, and flags URLs multiple indexes agree on. The table below is for choosing a single engine directly.
+For multi-source research, prefer the **web-research** skill (`../web-research/`) — its `meta-search.sh` fans out to Kagi + Marginalia (+ Exa and DeepSeek with `-e all`; `-e cheap` = Marginalia + DeepSeek for loops) in parallel, dedupes, and flags URLs multiple indexes agree on. The table below is for choosing a single engine directly.
 
 The two skills are designed to be used **together**. Marginalia is free; Kagi costs $0.012/search + $0.004/extract. Marginalia has no content-extraction — it returns snippets only.
 
@@ -116,7 +116,7 @@ The two skills are designed to be used **together**. Marginalia is free; Kagi co
 | SEO-spam-prone topics (recipes, DIY, product experience, "best X") | **Marginalia first** — its ranking penalizes commercial spam |
 | Pre-web-2.0 / retro content, `year<` filtering | **Marginalia** (Kagi has no old-web bias) |
 | Mainstream facts, news, current events | **Kagi** (Marginalia's index is smaller and crawls slowly) |
-| Need full page content for synthesis | **Kagi** search+extract, or Marginalia to find the URL then `../web-research/scripts/fetch-page.sh URL` (Exa $0.001 → Kagi $0.004 → free fallbacks) |
+| Need full page content for synthesis | **Kagi** search+extract, or Marginalia to find the URL then `../web-research/scripts/fetch-page.sh URL` (Exa $0.001 → DeepSeek $0.00075 → Kagi $0.004 → free fallbacks) |
 | Cheap breadth pass before spending Kagi budget | **Marginalia** (free) then Kagi on what's missing |
 | X/Twitter, images, videos, podcasts | **Kagi only** |
 | Domain-restricted lookup on a big mainstream site | Either works (`site:` on both); Marginalia is free |

@@ -2,8 +2,14 @@
 set -euo pipefail
 
 # scripts/find-similar.sh — Exa link similarity (POST api.exa.ai/findSimilar)
-# Give it a URL, get semantically similar pages. $0.007/request.
-# No equivalent exists in Kagi or Marginalia — this is Exa-only capability.
+# Give it a URL, get semantically similar pages.
+#
+# DEPRECATED by Exa (exa-spec.yaml 2.0.0, read 2026-10-18): "prefer /search
+# with a query describing the source". Still works and bills as neural search
+# at $0.004 (live costDollars 2026-10-18; it was $0.007). It can return fewer
+# results than -n asks for. If it starts to fail, fetch the source page and
+# run search.sh with a one-sentence description of that page instead.
+# No equivalent exists in Kagi or Marginalia.
 #
 # Usage:
 #   find-similar.sh [options] URL

@@ -4,9 +4,13 @@ set -uo pipefail
 # scripts/fetch-page.sh — page-to-markdown with automatic fallback ladder.
 #
 # Tries each rung in order until one yields content:
-#   0. exa       Exa contents API ($0.001) — cheapest; serves from Exa's crawl
-#                cache (fast, sometimes stale); succeeds on some pages Kagi
-#                can't crawl. NOT for X/Twitter (use kagi).
+#   0. exa       Exa contents API ($0.001): markdown with tables and code
+#                fences; serves from Exa's crawl cache, refetches copies older
+#                than FETCH_EXA_MAX_AGE_HOURS, and rejects a cached page whose
+#                text never mentions the URL slug. NOT for X/Twitter (use kagi).
+#   0. deepseek  DeepSeek Fetch API ($0.00075, billed only on success): live,
+#                cheapest, but flat text (no links, no code fences). NOT for
+#                X/Twitter (use kagi).
 #   1. kagi      Kagi extract API ($0.004) — best quality, handles X/Twitter
 #   2. curl      plain HTTP + local bs4 extraction — free, no JS
 #   3. playwright headless Chromium render + local extraction — free, runs JS,
@@ -22,8 +26,11 @@ set -uo pipefail
 #
 # Options:
 #   -m METHODS  comma-separated ladder override, e.g. -m curl,playwright
-#               (default: exa,kagi,curl,playwright,camoufox,wayback;
-#                X/Twitter URLs auto-skip the exa rung)
+#               (default: `ladder` in ~/.config/web-research/config or
+#                WEB_RESEARCH_LADDER, else exa,deepseek,kagi,curl,playwright,
+#                camoufox,wayback. Paid rungs without a key, not installed, or
+#                disabled in the config are skipped and listed in `attempts`.
+#                X/Twitter URLs auto-skip the exa and deepseek rungs)
 #   -t SECS     per-rung timeout (default 25)
 #
 # Env:
@@ -33,6 +40,8 @@ set -uo pipefail
 #                      ~/.venvs/camoufox/bin/python if present, else FETCH_PYTHON)
 #   SEARCH_SKILLS_DIR  directory holding the sibling engine skills
 #                      (default: two levels up from this script)
+#   FETCH_EXA_MAX_AGE_HOURS  exa rung cache age limit (default 168; 0 = always
+#                      fresh, -1 = cache only)
 #
 # Output: one JSON object on stdout:
 #   {"url", "method", "title", "markdown", "attempts": {rung: "error", ...}}
@@ -42,8 +51,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_ROOT="${SEARCH_SKILLS_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 KAGI_SCRIPTS="$SKILLS_ROOT/kagi-search/scripts"
 EXA_SCRIPTS="$SKILLS_ROOT/exa-search/scripts"
+DS_SCRIPTS="$SKILLS_ROOT/deepseek-search/scripts"
 
-METHODS="exa,kagi,curl,playwright,camoufox,wayback"
+METHODS=""
 TIMEOUT=25
 PY="${FETCH_PYTHON:-python3}"
 if [ -z "${CAMOUFOX_PYTHON:-}" ]; then
@@ -90,13 +100,43 @@ print(json.dumps({"url": os.environ["URL"], "method": os.environ["RUNG"],
                   "attempts": json.loads(os.environ["ATT"])}))' "$2"
 }
 
-try_exa() {
+is_x_url() {
 	case "$URL" in
-	*//x.com/*|*//twitter.com/*|*//www.x.com/*|*//www.twitter.com/*)
-		note_failure exa "skipped for X/Twitter (kagi renders tweets)"; return 1 ;;
+	*//x.com/*|*//twitter.com/*|*//www.x.com/*|*//www.twitter.com/*|*//mobile.twitter.com/*) return 0 ;;
 	esac
+	return 1
+}
+
+try_deepseek() {
+	is_x_url && { note_failure deepseek "skipped for X/Twitter (kagi renders tweets)"; return 1; }
+	if [ -z "${DEEPSEEK_API_KEY:-}" ] && [ ! -r "$HOME/.config/deepseek/api_key" ]; then
+		note_failure deepseek "skipped: no key configured"; return 1
+	fi
+	[ -f "$DS_SCRIPTS/fetch.sh" ] || { note_failure deepseek "deepseek-search skill not found at $DS_SCRIPTS"; return 1; }
+	if ! DEEPSEEK_TIMEOUT="$TIMEOUT" bash "$DS_SCRIPTS/fetch.sh" "$URL" >"$TMPD/ds.json" 2>"$TMPD/ds.err"; then
+		note_failure deepseek "$(head -c 200 "$TMPD/ds.err")"
+		return 1
+	fi
+	if ! python3 -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+text = d.get("content") or ""
+if len(text.strip()) < 200:
+    raise SystemExit(f"thin content ({len(text)} chars)")
+json.dump({"title": d.get("title", ""), "markdown": text}, open(sys.argv[2], "w"))' \
+		"$TMPD/ds.json" "$TMPD/out.json" 2>"$TMPD/ds.err2"; then
+		note_failure deepseek "$(head -c 200 "$TMPD/ds.err2")"
+		return 1
+	fi
+	emit_success deepseek "$TMPD/out.json"
+}
+
+try_exa() {
+	is_x_url && { note_failure exa "skipped for X/Twitter (kagi renders tweets)"; return 1; }
 	[ -f "$EXA_SCRIPTS/contents.sh" ] || { note_failure exa "exa-search skill not found at $EXA_SCRIPTS"; return 1; }
-	if ! bash "$EXA_SCRIPTS/contents.sh" "$URL" >"$TMPD/exa.json" 2>"$TMPD/exa.err"; then
+	# maxAgeHours: refetch when Exa's cached copy is older than this (default 168 h).
+	# Replaces deprecated livecrawl. Same $0.001 price (verified 2026-10-18).
+	if ! bash "$EXA_SCRIPTS/contents.sh" -a "${FETCH_EXA_MAX_AGE_HOURS:-168}" "$URL" >"$TMPD/exa.json" 2>"$TMPD/exa.err"; then
 		note_failure exa "$(head -c 200 "$TMPD/exa.err")"
 		return 1
 	fi
@@ -108,8 +148,21 @@ status = (d.get("statuses") or [{}])[0]
 text = item.get("text") or ""
 if status.get("status") != "success" or len(text.strip()) < 200:
     raise SystemExit(status.get("error") or f"thin content ({len(text)} chars)")
+# Stale-cache guard (verified 2026-10-18: a new docs page came back as the
+# cached site index). If the URL slug is plain words and none of them occur
+# in a CACHED page, treat the page as stale and fall through.
+if status.get("source") == "cached":
+    import re
+    from urllib.parse import unquote, urlsplit
+    seg = [s for s in unquote(urlsplit(sys.argv[3]).path).split("/") if s]
+    slug = re.sub(r"\.(html?|php|aspx?)$", "", seg[-1]) if seg else ""
+    words = [w.lower() for w in re.split(r"[-_.+ ()]+", slug) if re.fullmatch(r"[A-Za-z]{3,}", w)]
+    hay = (item.get("title", "") + " " + text).lower()
+    if words and not any(w in hay for w in words):
+        seen = item.get("title", "")[:60]
+        raise SystemExit(f"stale cache? slug words {words} absent from cached page: {seen}")
 json.dump({"title": item.get("title",""), "markdown": text}, open(sys.argv[2], "w"))' \
-		"$TMPD/exa.json" "$TMPD/out.json" 2>"$TMPD/exa.err2"; then
+		"$TMPD/exa.json" "$TMPD/out.json" "$URL" 2>"$TMPD/exa.err2"; then
 		note_failure exa "$(head -c 200 "$TMPD/exa.err2")"
 		return 1
 	fi
@@ -222,9 +275,16 @@ print(s.get("url", "") if s.get("available") else "")' "$TMPD/wb.json" 2>/dev/nu
 	fetch_and_extract "$snap" wayback
 }
 
+# Resolve the ladder against keys, installs and config (scripts/_engines.py).
+RESOLVED="$(python3 "$SCRIPT_DIR/_engines.py" ladder "$METHODS")" || exit 2
+METHODS="$(printf '%s' "$RESOLVED" | python3 -c 'import json,sys; print(",".join(json.load(sys.stdin)["ladder"]))')"
+while IFS=$'\t' read -r rung why; do
+	[ -n "$rung" ] && note_failure "$rung" "$why"
+done < <(printf '%s' "$RESOLVED" | python3 -c 'import json,sys; [print(f"{k}\t{v}") for k,v in json.load(sys.stdin)["skip"].items()]')
 IFS=',' read -ra LADDER <<<"$METHODS"
 for rung in "${LADDER[@]}"; do
 	case "$rung" in
+	deepseek) try_deepseek && exit 0 ;;
 	exa) try_exa && exit 0 ;;
 	kagi) try_kagi && exit 0 ;;
 	curl) try_curl && exit 0 ;;

@@ -1,16 +1,21 @@
 #!/bin/bash
-# scripts/doctor.sh — check that the search-three skills are ready to use.
+# scripts/doctor.sh — check that the web-research skills are ready to use.
 #
-# Checks required tools, API keys for each engine, and the optional
+# Checks required tools, the five skill folders, API keys for each engine,
+# engine selection (~/.config/web-research/config), and the optional
 # extraction extras used by fetch-page.sh. Makes NO network calls unless
-# --live is given.
+# --live is given. Never prints key values.
+#
+# Every engine is optional: a missing key only removes that engine.
 #
 # Usage:
 #   doctor.sh           # offline checks only (free)
-#   doctor.sh --live    # + one real query per configured engine
-#                       #   (kagi ~$0.012, exa ~$0.007, marginalia 1 quota)
+#   doctor.sh --live    # + one real query per usable engine
+#                       #   (kagi ~$0.012, exa ~$0.007, deepseek ~$0.00075,
+#                       #    marginalia 1 quota)
 #
-# Exit status: 0 if every engine has a key and required tools exist, else 1.
+# Exit status: 0 if the required tools exist and at least one engine is
+# usable, else 1.
 
 set -uo pipefail
 
@@ -29,40 +34,48 @@ echo "Required tools"
 for t in bash curl python3; do
 	if command -v "$t" >/dev/null 2>&1; then ok "$t"; else bad "$t not found"; fi
 done
+command -v python3 >/dev/null 2>&1 || { echo; echo "Not ready — install python3."; exit 1; }
 
 echo "Skills (in $SKILLS_ROOT)"
-for s in web-research kagi-search exa-search marginalia-search; do
-	if [ -f "$SKILLS_ROOT/$s/SKILL.md" ]; then ok "$s"; else bad "$s missing — keep all four skill folders side by side (or set SEARCH_SKILLS_DIR)"; fi
+if [ -f "$SKILLS_ROOT/web-research/SKILL.md" ]; then ok "web-research"; else bad "web-research missing (set SEARCH_SKILLS_DIR?)"; fi
+for s in kagi-search marginalia-search exa-search deepseek-search; do
+	if [ -f "$SKILLS_ROOT/$s/SKILL.md" ]; then ok "$s"; else warn "$s missing — that engine is unavailable (keep the skill folders side by side, or set SEARCH_SKILLS_DIR)"; fi
 done
 
-# key_status ENV_VAR CONFIG_DIR
-key_status() {
-	local var="$1" dir="$2"
-	if [ -n "${!var:-}" ]; then
-		echo "env"
-	elif [ -s "$HOME/.config/$dir/api_key" ]; then
-		echo "file"
-	else
-		echo "none"
-	fi
-}
-
-echo "API keys"
-k="$(key_status KAGI_API_KEY kagi)"
-case "$k" in
-none) bad "kagi: no KAGI_API_KEY and no ~/.config/kagi/api_key  → https://kagi.com/api" ;;
-*) ok "kagi ($k)" ;;
-esac
-e="$(key_status EXA_API_KEY exa)"
-case "$e" in
-none) bad "exa: no EXA_API_KEY and no ~/.config/exa/api_key  → https://dashboard.exa.ai" ;;
-*) ok "exa ($e)" ;;
-esac
-m="$(key_status MARGINALIA_API_KEY marginalia)"
-case "$m" in
-none) warn "marginalia: no key — falling back to the shared, heavily rate-limited 'public' key  → https://about.marginalia-search.com/article/api/" ;;
-*) ok "marginalia ($m)" ;;
-esac
+echo "API keys and engine selection"
+STATUS="$(SEARCH_SKILLS_DIR="$SKILLS_ROOT" python3 "$SCRIPT_DIR/_engines.py" status --json)" || { bad "engine config: $STATUS"; STATUS=""; }
+USABLE=""
+if [ -n "$STATUS" ]; then
+	while IFS=$'\t' read -r level msg; do
+		case "$level" in
+		ok) ok "$msg" ;;
+		warn) warn "$msg" ;;
+		info) echo "    $msg" ;;
+		esac
+	done < <(printf '%s' "$STATUS" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+signup = {"kagi": "https://kagi.com/api", "exa": "https://dashboard.exa.ai",
+          "deepseek": "https://platform.deepseek.com",
+          "marginalia": "https://about.marginalia-search.com/article/api/"}
+for name, r in d["engines"].items():
+    if r["usable"]:
+        if r.get("public"):
+            print("warn\t" + f"{name}: no key, using the shared public key (heavily rate-limited)  → {signup[name]}")
+        else:
+            src = r["key"]
+            print("ok\t" + f"{name} ({src})")
+    elif r["reason"] == "no key":
+        print("warn\t" + f"{name}: no key, engine skipped  → {signup[name]}")
+    else:
+        print("warn\t" + f"{name}: {r['reason']}, engine skipped")
+print("info\t" + "default fan-out: " + (", ".join(d["default"]) or "none"))
+print("info\t" + "fetch ladder: " + " -> ".join(d["ladder"]))
+cfg = d["config"] if d["config_present"] else d["config"] + " (absent: every engine with a key is used)"
+print("info\t" + "config: " + cfg)')
+	USABLE="$(printf '%s' "$STATUS" | python3 -c 'import json,sys; print(",".join(n for n,r in json.load(sys.stdin)["engines"].items() if r["usable"]))')"
+	[ -n "$USABLE" ] || bad "no usable search engine — add at least one API key (see README → API keys)"
+fi
 
 echo "Optional fetch-page.sh extras (free fallback rungs)"
 if "$PY" -c "import bs4" 2>/dev/null; then
@@ -85,27 +98,37 @@ else
 	warn "camoufox missing — anti-detect rung disabled (optional; see README)"
 fi
 
+has() { case ",$USABLE," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
+
 if [ -n "$LIVE" ]; then
 	echo "Live checks"
-	if [ "$k" != "none" ]; then
-		if bash "$SKILLS_ROOT/kagi-search/scripts/search-v1.sh" -l 1 "kagi search api" >/dev/null 2>/tmp/doctor-kagi.$$; then
+	TMPE="$(mktemp)"
+	if has kagi; then
+		if bash "$SKILLS_ROOT/kagi-search/scripts/search-v1.sh" -l 1 "kagi search api" >/dev/null 2>"$TMPE"; then
 			ok "kagi search"
-		else bad "kagi search: $(head -c 200 /tmp/doctor-kagi.$$)"; fi
+		else bad "kagi search: $(head -c 200 "$TMPE")"; fi
 	fi
-	if [ "$e" != "none" ]; then
-		if bash "$SKILLS_ROOT/exa-search/scripts/search.sh" -n 1 "exa neural search api" >/dev/null 2>/tmp/doctor-exa.$$; then
+	if has exa; then
+		if bash "$SKILLS_ROOT/exa-search/scripts/search.sh" -t instant -n 1 "exa neural search api" >/dev/null 2>"$TMPE"; then
 			ok "exa search"
-		else bad "exa search: $(head -c 200 /tmp/doctor-exa.$$)"; fi
+		else bad "exa search: $(head -c 200 "$TMPE")"; fi
 	fi
-	if bash "$SKILLS_ROOT/marginalia-search/scripts/search.sh" -c 1 "linear b" >/dev/null 2>/tmp/doctor-marg.$$; then
-		ok "marginalia search ($(grep -o 'quota: .*' /tmp/doctor-marg.$$ || echo 'no ledger'))"
-	else bad "marginalia search: $(grep -v quota /tmp/doctor-marg.$$ | head -c 200)"; fi
-	rm -f /tmp/doctor-*.$$
+	if has deepseek; then
+		if bash "$SKILLS_ROOT/deepseek-search/scripts/search.sh" -c 1 "deepseek api" >/dev/null 2>"$TMPE"; then
+			ok "deepseek search"
+		else bad "deepseek search: $(head -c 200 "$TMPE")"; fi
+	fi
+	if has marginalia; then
+		if bash "$SKILLS_ROOT/marginalia-search/scripts/search.sh" -c 1 "linear b" >/dev/null 2>"$TMPE"; then
+			ok "marginalia search ($(grep -o 'quota: .*' "$TMPE" || echo 'no ledger'))"
+		else bad "marginalia search: $(grep -v quota "$TMPE" | head -c 200)"; fi
+	fi
+	rm -f "$TMPE"
 fi
 
 echo
 if [ "$FAIL" = 0 ]; then
-	echo "Ready."
+	echo "Ready. Usable engines: ${USABLE//,/, }"
 else
 	echo "Not ready — fix the ✗ items above."
 fi

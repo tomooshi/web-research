@@ -1,14 +1,15 @@
 #!/bin/bash
-# scripts/search-cost.sh — summarize local usage ledgers for all three engines.
+# scripts/search-cost.sh — summarize local usage ledgers for every engine.
 #
 # The engine scripts append one JSON line per call to:
-#   ${XDG_STATE_HOME:-~/.local/state}/{kagi,exa,marginalia}/usage.jsonl
-# (override per engine with KAGI_LEDGER / EXA_LEDGER / MARGINALIA_LEDGER).
+#   ${XDG_STATE_HOME:-~/.local/state}/{kagi,exa,deepseek,marginalia}/usage.jsonl
+# (override per engine with KAGI_LEDGER / EXA_LEDGER / DEEPSEEK_LEDGER /
+# MARGINALIA_LEDGER). Engines with no ledger are left out of the table.
 #
 # Usage:
 #   search-cost.sh          # today / this month / all time
 #
-# Kagi and Exa report estimated USD; Marginalia reports query count against
+# Kagi, Exa and DeepSeek report estimated USD (DeepSeek: empty results unbilled); Marginalia reports query count against
 # its daily quota (UTC window, MARGINALIA_QUOTA_LIMIT, default 1000).
 # Ledgers only see calls made through these scripts — the providers'
 # dashboards are the source of truth for billing.
@@ -53,18 +54,26 @@ def money(engine):
                 out[name][1] += 1
     return out
 
-k, e = money("kagi"), money("exa")
+money_engines = [e for e in ("kagi", "exa", "deepseek") if os.path.exists(path(e))]
+cols = {e: money(e) for e in money_engines}
+has_marg = os.path.exists(path("marginalia"))
 m = {"today": 0, "month": 0, "all": 0}
 for ts, _ in records("marginalia"):
     m["all"] += 1
     if ts >= month_local: m["month"] += 1
     if ts >= day_utc: m["today"] += 1
 
-print(f"{'':8} {'kagi':>16} {'exa':>16} {'marginalia':>18}")
+if not money_engines and not has_marg:
+    print("no ledgers yet (no search has run through these scripts)")
+    raise SystemExit(0)
+head = f"{'':8}" + "".join(f" {e:>16}" for e in money_engines) + (f" {'marginalia':>18}" if has_marg else "")
+print(head)
 for name in ("today", "month", "all"):
-    marg = f"{m[name]}/{limit} (UTC)" if name == "today" else str(m[name])
-    print(f"{name:8} {'$%.3f (%d)' % tuple(k[name]):>16} {'$%.3f (%d)' % tuple(e[name]):>16} {marg:>18}")
-if m["today"] >= 0.8 * limit:
+    row = f"{name:8}" + "".join(f" {'$%.3f (%d)' % tuple(cols[e][name]):>16}" for e in money_engines)
+    if has_marg:
+        row += f" {(f'{m[name]}/{limit} (UTC)' if name == 'today' else str(m[name])):>18}"
+    print(row)
+if has_marg and m["today"] >= 0.8 * limit:
     print(f"warning: marginalia at {100 * m['today'] // limit}% of its daily HARD limit")
-print(f"ledgers: {path('kagi')}, {path('exa')}, {path('marginalia')}")
+print("ledgers: " + ", ".join(path(e) for e in money_engines + (["marginalia"] if has_marg else [])))
 PY
