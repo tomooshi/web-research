@@ -110,7 +110,7 @@ Env: `DEEPSEEK_BASE_URL` (mocks), `DEEPSEEK_RETRIES` (default 2), `DEEPSEEK_TIME
 
 ## Cost ledger
 
-`~/.local/state/deepseek/usage.jsonl`, one line per HTTP-200 call: `{ts, ep, usd, n, q}`. Unbilled empty results log `usd: 0`. Disable with `DEEPSEEK_LEDGER=off`. The `search-cost` extension shows it in the footer as `ds $…` and in `/search-cost`.
+`${XDG_STATE_HOME:-~/.local/state}/deepseek/usage.jsonl`, one line per HTTP-200 call: `{ts, ep, usd, n, q}`. Unbilled empty results log `usd: 0`. Disable with `DEEPSEEK_LEDGER=off`. The `search-cost` extension shows it in the footer as `ds $…` and in `/search-cost`.
 
 ## Gotchas
 
