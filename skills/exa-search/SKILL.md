@@ -45,14 +45,14 @@ Auth header `x-api-key` still works; the docs now show `Authorization: Bearer`.
 ## Usage
 
 ```bash
-./scripts/search.sh "essays on why personal websites matter"           # highlights, 600 chars
+./scripts/search.sh "essays on why personal websites matter"           # highlights, Exa chooses the amount
 ./scripts/search.sh -o "prefer official docs; pull the default k value" "reciprocal rank fusion"
 ./scripts/search.sh -c publication -a 2024-01-01 "form validation usability"
 ./scripts/search.sh -t lite "recent product updates from major AI labs"     # $0.004, ~0.5 s
 ./scripts/search.sh -d "nngroup.com,baymard.com" "checkout flow research"
 ./scripts/search.sh -x -n 5 "digital garden essays"       # + full text (no extra cost observed)
 ./scripts/search.sh -H "query"                            # no highlights
-./scripts/search.sh -h 0 "query"                          # highlights sized by Exa (~1.5-5.5K chars/result)
+./scripts/search.sh -h 600 "query"                        # fixed ~600-char highlight per result (smaller output)
 
 ./scripts/find-similar.sh https://lawsofux.com/           # DEPRECATED endpoint, still works
 ./scripts/find-similar.sh -e -n 10 https://seirdy.one/    # exclude source domain
@@ -103,7 +103,7 @@ Documented: `company`, `publication`, `news`, `personal site`, `financial report
 - `costDollars.total` is the authoritative per-request cost — the ledger records it directly.
 - `resolvedSearchType` now comes back as an empty string. Do not rely on it.
 - `entities` appears on some results (publications carry year, venue, citation count, authors).
-- `highlights.maxCharacters` is a **soft** limit: a 600-char request returned a 2,566-char highlight. Exa's docs now recommend bare `highlights: true` (`-h 0`) and `maxCharacters` "only when your application requires a fixed per-page limit". This script keeps 600 as its default to protect the agent's context: bare `true` returned 1.6-5.6K chars per result (about 4x more).
+- **Highlights default: Exa chooses** (bare `highlights: true`, Exa's recommended default since 3.0). Observed 1.6-5.6K chars per result, so 10 results can reach ~40K chars. For a smaller output use `-h CHARS` (a fixed per-result limit, and a **soft** one: a 600-char request returned a 2,566-char highlight) or fewer results (`-n`). `meta-search.sh` sizes Exa highlights to its snippet cap (`-s`, default 500), and lets Exa choose with `-s 0`.
 - `warnings` (Exa 3.0): request fields with no effect, e.g. `{"code": "IGNORED_FIELD", "path": "/startCrawlDate", "message": "…"}`. Fix the request.
 - `notices` (Exa 3.0): how the results were produced, written for the model, e.g. `RESTRICTIONS_RELAXED` (path `/query`). Both arrays are omitted when empty; codes are an open set, so read `message` for unknown codes.
 - `/contents` responses include `statuses[]` with `source: cached | crawled` and per-URL errors.

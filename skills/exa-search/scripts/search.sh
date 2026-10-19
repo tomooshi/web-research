@@ -36,8 +36,10 @@ set -euo pipefail
 #   -b DATE      endPublishedDate (YYYY-MM-DD)
 #   -o TEXT      objective: the goal this search serves — which documents
 #                should rank first, which to exclude, what facts to pull
-#   -h CHARS     highlights per result, max chars (default 600, a soft limit;
-#                0 = bare highlights:true, Exa decides: ~1.5-5.5K chars/result)
+#   -h CHARS     fixed per-result highlight limit in chars (a soft limit).
+#                Default 0 = bare highlights:true: Exa chooses how much text to
+#                return per result (Exa's recommended default; ~1.5-5.5K chars
+#                per result observed 2026-10-19)
 #   -H           no highlights
 #   -x           include full page text (contents.text)
 #   -j JSON      extra JSON merged into request body
@@ -52,7 +54,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/_common.sh"
 
-NUM="" TYPE="" CATEGORY="" DOMAINS="" AFTER="" BEFORE="" TEXT="" EXTRA="" OBJ="" HL=600
+NUM="" TYPE="" CATEGORY="" DOMAINS="" AFTER="" BEFORE="" TEXT="" EXTRA="" OBJ="" HL=0
 while getopts ":n:t:c:d:a:b:o:h:Hxj:" opt; do
 	case "$opt" in
 	n) NUM="$OPTARG" ;;
