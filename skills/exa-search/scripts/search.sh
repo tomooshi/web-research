@@ -7,20 +7,27 @@ set -euo pipefail
 # ("blog posts where practitioners argue against lazy loading" beats
 # "lazy loading criticism"). Pass the task goal with -o (Exa `objective`).
 #
-# Cost (exa.ai/docs/admin/pricing + live costDollars, 2026-10-18):
-#   type instant $0.004 · fast/auto $0.007 · deep-lite/deep $0.012 ·
-#   deep-reasoning $0.015 — base covers 10 results, +$0.001/result above 10.
-#   Highlights and text inside /search did NOT change costDollars (verified
-#   live 2026-10-18, 5 results). Only AI summaries bill extra ($0.001/page).
+# Cost (exa.ai/docs/admin/pricing + live costDollars, Exa 3.0, 2026-10-19):
+#   lite $0.004 · auto $0.007 · deep-lite/deep $0.012 — base covers 10
+#   results, +$0.001/result above 10. Legacy types keep their prices:
+#   instant $0.004, fast $0.007, deep-reasoning $0.015.
+#   Highlights and text inside /search do NOT change costDollars (verified
+#   live). Only AI summaries bill extra ($0.001/page).
 #
 # Usage:
 #   search.sh [options] "query"
 #
 # Options:
 #   -n NUM       number of results, 1-100 (default 10; >10 bills extra)
-#   -t TYPE      instant | fast | auto | deep-lite | deep | deep-reasoning
-#                (default auto). "keyword" is no longer documented but still
-#                accepted and billed as keyword (2026-10-18).
+#   -t TYPE      lite | auto | deep-lite | deep (default auto).
+#                lite: $0.004, ~0.5 s, cached pages only, and ONLY these
+#                fields: query, numResults, category, includeDomains,
+#                excludeDomains, start/endPublishedDate, objective,
+#                contents.highlights, contents.text (+ userLocation,
+#                moderation). Any other field (e.g. -j additionalQueries,
+#                contents.maxAgeHours) returns HTTP 400 naming the field.
+#                Legacy, still working: instant (use lite), fast (use lite),
+#                deep-reasoning (use deep). "keyword" is undocumented.
 #   -c CATEGORY  company | publication | news | "personal site" |
 #                "financial report" | people. Other strings are only hints
 #                ("research paper" returned the same results as publication).
@@ -29,7 +36,8 @@ set -euo pipefail
 #   -b DATE      endPublishedDate (YYYY-MM-DD)
 #   -o TEXT      objective: the goal this search serves — which documents
 #                should rank first, which to exclude, what facts to pull
-#   -h CHARS     highlights per result, max chars (default 600; 0 = Exa decides)
+#   -h CHARS     highlights per result, max chars (default 600, a soft limit;
+#                0 = bare highlights:true, Exa decides: ~1.5-5.5K chars/result)
 #   -H           no highlights
 #   -x           include full page text (contents.text)
 #   -j JSON      extra JSON merged into request body
@@ -37,7 +45,7 @@ set -euo pipefail
 # Examples:
 #   search.sh "startups building anti-detect browsers"
 #   search.sh -c publication -a 2024-01-01 "form validation usability studies"
-#   search.sh -t instant "recent product updates from major AI labs"
+#   search.sh -t lite "recent product updates from major AI labs"
 #   search.sh -o "find the original RRF paper and its main result" "reciprocal rank fusion"
 #   search.sh -x -n 5 "essays on digital gardens"      # with full text
 

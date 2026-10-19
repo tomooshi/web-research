@@ -112,7 +112,7 @@ if [ -n "$LIVE" ]; then
 		else bad "kagi search: $(head -c 200 "$TMPE")"; fi
 	fi
 	if has exa; then
-		if bash "$SKILLS_ROOT/exa-search/scripts/search.sh" -t instant -n 1 "exa neural search api" >/dev/null 2>"$TMPE"; then
+		if bash "$SKILLS_ROOT/exa-search/scripts/search.sh" -t lite -n 1 "exa neural search api" >/dev/null 2>"$TMPE"; then
 			ok "exa search"
 		else bad "exa search: $(head -c 200 "$TMPE")"; fi
 	fi

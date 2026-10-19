@@ -11,7 +11,7 @@ set -uo pipefail
 # agreement still sorts first. Agreement across retrieval mechanisms is the
 # strongest relevance vote this stack can produce.
 #
-# Cost per call: kagi $0.012 · exa $0.007 auto / $0.004 instant (highlights included) ·
+# Cost per call: kagi $0.012 · exa $0.004 lite (default) / $0.007 auto (highlights included) ·
 #                deepseek $0.00075 (only if non-empty) · marginalia 1 quota.
 # Tolerates engines failing — you get whatever succeeded.
 #
@@ -34,7 +34,10 @@ set -uo pipefail
 #   -o GOAL     the user's question or task goal: sent as deepseek ori_question
 #               (truncated to 128 chars) and exa objective (4096 chars)
 #   -s CHARS    snippet cap (default 500; 0 = no cap)
-#   -i          exa type instant: $0.004 instead of $0.007 (lower latency)
+#   -X TYPE     exa search type (default lite: $0.004, ~0.5 s, cached pages;
+#               auto: $0.007, ~1.5 s, more compute). Exa 3.0 test 2026-10-19:
+#               lite and auto shared 7-9 of their top 10 results on 5 queries.
+#   -i          old flag for the cheap Exa type; lite is now the default (no-op)
 #
 # Output (JSON):
 #   {
@@ -72,16 +75,17 @@ ENGINE="default"
 WORKFLOW=""
 ORIQ=""
 SNIP=500
-EXA_TYPE=""
+EXA_TYPE="lite"
 
-while getopts ":c:e:w:o:s:i" opt; do
+while getopts ":c:e:w:o:s:iX:" opt; do
 	case "$opt" in
 	c) COUNT="$OPTARG" ;;
 	e) ENGINE="$OPTARG" ;;
 	w) WORKFLOW="$OPTARG" ;;
 	o) ORIQ="$OPTARG" ;;
 	s) SNIP="$OPTARG" ;;
-	i) EXA_TYPE=instant ;;
+	i) ;;  # kept for old callers: lite is the default now
+	X) EXA_TYPE="$OPTARG" ;;
 	\?) echo "Unknown option: -$OPTARG" >&2; exit 2 ;;
 	:) echo "Option -$OPTARG requires an argument" >&2; exit 2 ;;
 	esac
@@ -150,6 +154,8 @@ fi
 # Surface the marginalia quota line (its stderr) so the agent sees it.
 # (Redirect order matters: >&2 first, then silence grep's own errors.)
 grep -h 'marginalia quota' "$TMPD/marg.err" >&2 2>/dev/null || true
+# Exa warnings (request fields with no effect) are bugs in the request: show them.
+grep -h '^exa warning' "$TMPD/exa.err" >&2 2>/dev/null || true
 
 QUERY="$QUERY" TMPD="$TMPD" SNIP="$SNIP" python3 <<'PY'
 import html, json, os, re, sys
@@ -268,7 +274,7 @@ def add(url, title, snippet, source, rank, published=None, **extra):
             rec.setdefault(k, v)
 
 
-engines, cost = {}, {}
+engines, cost, notices = {}, {}, {}
 
 def status_for(label, fname):
     data, st = load(fname)
@@ -302,11 +308,18 @@ if marg:
 
 exa = status_for("exa", "exa")
 if exa:
-    cost["exa"] = (exa.get("costDollars") or {}).get("total", 0.007)
+    cost["exa"] = (exa.get("costDollars") or {}).get("total", 0.004)
+    # Exa 3.0 notices are written for the model. RESTRICTIONS_RELAXED means no
+    # page matched a site: operator or quoted phrase, so Exa's results come from
+    # a search WITHOUT it: flag them, so they are not read as in-scope hits.
+    exa_notices = exa.get("notices") or []
+    if exa_notices:
+        notices["exa"] = [{"code": n.get("code"), "message": n.get("message")} for n in exa_notices]
+    relaxed = any(n.get("code") == "RESTRICTIONS_RELAXED" for n in exa_notices)
     for i, item in enumerate(exa.get("results") or [], 1):
         snippet = " ... ".join(item.get("highlights") or []) or item.get("text")
         add(item["url"], item.get("title"), snippet, "exa", i,
-            published=item.get("publishedDate"))
+            published=item.get("publishedDate"), exa_relaxed=True if relaxed else None)
 
 ds = status_for("deepseek", "ds")
 if ds:
@@ -336,6 +349,7 @@ except OSError:
 print(json.dumps({
     "query": os.environ["QUERY"],
     **({"note": note} if note else {}),
+    **({"notices": notices} if notices else {}),
     "engines": engines,
     "cost": cost,
     "overlap": overlap,

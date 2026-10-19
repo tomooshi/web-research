@@ -11,7 +11,7 @@
       "name": "web-research",
       "source": "./",
       "description": "Four-engine web research skills for coding agents (Kagi, Marginalia, Exa, DeepSeek; use any subset): parallel fan-out with rank fusion and cross-engine agreement, and a page-extraction fallback ladder.",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "category": "productivity"
     }
   ]

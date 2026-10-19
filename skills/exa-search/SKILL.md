@@ -1,13 +1,20 @@
 ---
 name: exa-search
-description: "Neural/semantic web search via the Exa API (api.exa.ai) — retrieval by meaning (custom-trained embeddings over Exa's own crawl), not keywords. THE engine for conceptual queries ('essays arguing X', 'companies building Y'), publication/company/people category search, query-relevant highlights (free inside search), similarity expansion (find-similar.sh — deprecated by Exa but still working), and cheap page extraction (contents.sh, $0.001/page, 4x cheaper than Kagi extract, maxAgeHours freshness control). Use when the query describes what the answer looks like rather than what words it contains, when expanding from a known-good source, or for 'papers about', 'startups similar to', 'personal sites discussing'. Prefer kagi-search for operator-precision (site:/filetype:), news workflows, X/Twitter; marginalia-search for indie/old-web; deepseek-search for the cheapest search/fetch. Optional engine: needs EXA_API_KEY or ~/.config/exa/api_key (free tier $10 credits/month); when not configured, skip it and do not ask the operator for a key."
+description: "Neural/semantic web search via the Exa API (api.exa.ai) — retrieval by meaning (custom-trained embeddings over Exa's own crawl), not keywords. THE engine for conceptual queries ('essays arguing X', 'companies building Y'), publication/company/people category search, query-relevant highlights (free inside search), a $0.004 `lite` type (Exa 3.0), similarity expansion (find-similar.sh — deprecated by Exa but still working), and cheap page extraction (contents.sh, $0.001/page, 4x cheaper than Kagi extract, maxAgeHours freshness control). Use when the query describes what the answer looks like rather than what words it contains, when expanding from a known-good source, or for 'papers about', 'startups similar to', 'personal sites discussing'. Prefer kagi-search for operator-precision (site:/filetype:), news workflows, X/Twitter; marginalia-search for indie/old-web; deepseek-search for the cheapest search/fetch. Optional engine: needs EXA_API_KEY or ~/.config/exa/api_key (free tier $10 credits/month); when not configured, skip it and do not ask the operator for a key."
 ---
 
 # Exa Search (neural)
 
-Exa runs its own crawler, its own index, and retrieval by **custom-trained transformer embeddings** served from its own vector database. Verified live 2026-09-01/02; **API surface re-audited 2026-10-18** against `exa.ai/docs/exa-spec.yaml` (v2.0.0, the documented source of truth) and live calls.
+Exa runs its own crawler, its own index, and retrieval by **custom-trained transformer embeddings** served from its own vector database. Verified live 2026-09-01/02; **API surface re-audited 2026-10-18 and for Exa 3.0 on 2026-10-19** against `exa.ai/docs/exa-spec.yaml` (v2.0.0, the documented source of truth) and live calls.
 
-Docs moved to `exa.ai/docs` (index: `exa.ai/docs/llms.txt`; every page has a `.md` variant).
+Docs moved to `exa.ai/docs` (index: `exa.ai/docs/llms.txt`; every page has a `.md` variant; changes in `exa.ai/docs/changelog.md`).
+
+**Exa 3.0 (2026-10-19)**, as it affects these scripts:
+
+- New `lite` type ($0.004, ~0.5 s, cached pages only, limited fields). `instant`, `fast` and `deep-reasoning` are **legacy**: they still work at their old prices.
+- New `warnings` and `notices` arrays in `/search` responses. The scripts print them to stderr; `meta-search.sh` passes notices on.
+- A larger embedding model and a bigger index (ecommerce listings, local businesses, news, sports, weather, flights, events, podcasts). No new API fields or categories came with it.
+- "Dynamic Highlights is generally available", says the blog. **The API still requires the beta header**: `highlights.dynamic: true` without `Exa-Beta: dynamic-highlights-2026-08-28` returns HTTP 400 (verified 2026-10-19).
 
 ## Setup
 
@@ -33,6 +40,7 @@ Auth header `x-api-key` still works; the docs now show `Authorization: Bearer`.
 2. **Pass the goal with `-o`** (`objective`, ≤4096 chars). Exa's own guidance for agents: "Goal for this search turn; say which documents should rank first, which should be excluded, and what specific facts or figures to pull from them."
 3. **Read highlights, not full text.** `search.sh` asks for highlights by default (Exa's recommended baseline). Exa reports that 500 chars of highlights match the SimpleQA accuracy of 8,000 chars of page text.
 4. **Add hard constraints only when a violating result is useless** (domains, dates). Change `-t` last: a different mode cannot repair an underspecified query.
+5. **Read the notices.** A `RESTRICTIONS_RELAXED` notice means no page matched your `site:` operator or quoted phrase, so the results come from a search without it. Do not present those results as matching the restriction.
 
 ## Usage
 
@@ -40,11 +48,11 @@ Auth header `x-api-key` still works; the docs now show `Authorization: Bearer`.
 ./scripts/search.sh "essays on why personal websites matter"           # highlights, 600 chars
 ./scripts/search.sh -o "prefer official docs; pull the default k value" "reciprocal rank fusion"
 ./scripts/search.sh -c publication -a 2024-01-01 "form validation usability"
-./scripts/search.sh -t instant "recent product updates from major AI labs"  # $0.004
+./scripts/search.sh -t lite "recent product updates from major AI labs"     # $0.004, ~0.5 s
 ./scripts/search.sh -d "nngroup.com,baymard.com" "checkout flow research"
 ./scripts/search.sh -x -n 5 "digital garden essays"       # + full text (no extra cost observed)
 ./scripts/search.sh -H "query"                            # no highlights
-./scripts/search.sh -h 0 "query"                          # highlights sized by Exa
+./scripts/search.sh -h 0 "query"                          # highlights sized by Exa (~1.5-5.5K chars/result)
 
 ./scripts/find-similar.sh https://lawsofux.com/           # DEPRECATED endpoint, still works
 ./scripts/find-similar.sh -e -n 10 https://seirdy.one/    # exclude source domain
@@ -57,14 +65,20 @@ Auth header `x-api-key` still works; the docs now show `Authorization: Bearer`.
 
 ### Search types (`-t`)
 
+Exa recommends `lite`, `auto` and `deep` (changelog 2026-10-19).
+
 | Type | Price | Use |
 |---|---|---|
-| `instant` | **$0.004** | lowest latency; loops, autocomplete-like use |
-| `fast` | $0.007 | interactive |
-| `auto` (default) | $0.007 | balanced, recommended |
+| `lite` | **$0.004** | ~0.5 s; loops and fan-outs. Cached pages only. Default in `meta-search.sh` |
+| `auto` (default here) | $0.007 | ~1.5 s; more compute for candidates, highlights and ranking |
 | `deep-lite` | $0.012 | ~4 s synthesis |
 | `deep` | $0.012 | 4-15 s multi-step research with synthesis |
-| `deep-reasoning` | $0.015 | 12-40 s, harder research |
+| `instant`, `fast` (legacy) | $0.004, $0.007 | use `lite` |
+| `deep-reasoning` (legacy) | $0.015 | use `deep` |
+
+**`lite` accepts only** `query`, `numResults`, `category`, `includeDomains`, `excludeDomains`, `startPublishedDate`, `endPublishedDate`, `objective`, `contents.highlights`, `contents.text`, `contents.snapshotAsOf`, `userLocation`, `userIdentifier`, `metadata`, `moderation` and `compliance`. Any other field returns HTTP 400 that names it, e.g. `Not supported with type "lite": contents.maxAgeHours`. Then use `-t auto`.
+
+**`lite` against `auto`** (2026-10-19, 5 queries, 10 results each): they shared 7-9 of the top 10 (mean 7.8) and 12 of 15 top-3 slots. The differing results were not worse; only `lite` found the original RRF paper. Mean latency: 0.5 s against 1.5 s.
 
 `neural` and `keyword` are **no longer in the spec**. `-t keyword` is still accepted and billed as `keyword` (live 2026-10-18), so it may still help exact-string lookups, but it can disappear without notice. For exact strings, prefer Kagi.
 
@@ -89,7 +103,9 @@ Documented: `company`, `publication`, `news`, `personal site`, `financial report
 - `costDollars.total` is the authoritative per-request cost — the ledger records it directly.
 - `resolvedSearchType` now comes back as an empty string. Do not rely on it.
 - `entities` appears on some results (publications carry year, venue, citation count, authors).
-- `highlights.maxCharacters` is a **soft** limit: a 600-char request returned a 1,264-char highlight.
+- `highlights.maxCharacters` is a **soft** limit: a 600-char request returned a 2,566-char highlight. Exa's docs now recommend bare `highlights: true` (`-h 0`) and `maxCharacters` "only when your application requires a fixed per-page limit". This script keeps 600 as its default to protect the agent's context: bare `true` returned 1.6-5.6K chars per result (about 4x more).
+- `warnings` (Exa 3.0): request fields with no effect, e.g. `{"code": "IGNORED_FIELD", "path": "/startCrawlDate", "message": "…"}`. Fix the request.
+- `notices` (Exa 3.0): how the results were produced, written for the model, e.g. `RESTRICTIONS_RELAXED` (path `/query`). Both arrays are omitted when empty; codes are an open set, so read `message` for unknown codes.
 - `/contents` responses include `statuses[]` with `source: cached | crawled` and per-URL errors.
 
 ## Freshness: maxAgeHours (livecrawl is deprecated)
@@ -107,13 +123,14 @@ Verified 2026-10-18: without it, `api-docs.deepseek.com/guides/search` (a new pa
 
 Verified win (2026-09-01): `/contents` served seirdy.one (151K chars) from cache where Kagi's live crawler returned "No data from crawlers".
 
-## Pricing (exa.ai/docs/admin/pricing + live costDollars, 2026-10-18)
+## Pricing (exa.ai/docs/admin/pricing + live costDollars, 2026-10-19)
 
 | Endpoint | Cost |
 |---|---|
-| `/search` `instant` | **$0.004** base (≤10 results) |
-| `/search` `fast` / `auto` | **$0.007** base (≤10 results) |
-| `/search` deep types | $0.012-0.015 |
+| `/search` `lite` | **$0.004** base (≤10 results) |
+| `/search` `auto` | **$0.007** base (≤10 results) |
+| `/search` legacy `instant` / `fast` | $0.004 / $0.007 (unchanged) |
+| `/search` `deep-lite` / `deep` (legacy `deep-reasoning` $0.015) | $0.012 |
 | results above 10 | +$0.001/result |
 | highlights / text inside `/search` | **no extra charge observed** (5 results, live) |
 | AI page summaries | +$0.001/page, any endpoint |
@@ -121,7 +138,7 @@ Verified win (2026-09-01): `/contents` served seirdy.one (151K chars) from cache
 | `/contents` | **$0.001/page per content type** (text, highlights, summary each) |
 | `/answer` | $0.005 (not wrapped; our agents synthesize) |
 
-Not wrapped but available: `/monitors` (scheduled searches, $0.015), `/agent/runs` (async research, $0.012-$1.00), `/batches` (async batch of API requests), Snapshot (`snapshotAsOf`, paid tiers only).
+Not wrapped but available: `/monitors` (scheduled searches, $0.015), `/agent/runs` (async research, $0.012-$1.00; Exa now points `deep-reasoning` users there), `/batches` (async batch of API requests), Snapshot (`snapshotAsOf`, paid tiers only). Deprecated and not used here: `/search` `subpages`/`subpageTarget` (use `/contents`), rich links and code-block extras, `summary.maxTokens`.
 
 Ledger: `${XDG_STATE_HOME:-~/.local/state}/exa/usage.jsonl` (override path with `EXA_LEDGER=/path`, disable with `EXA_LEDGER=off`); `../web-research/scripts/search-cost.sh` summarizes spend for every engine (in pi, the bundled `search-cost` extension also shows it in the footer and `/search-cost`).
 
@@ -135,12 +152,13 @@ Ledger: `${XDG_STATE_HOME:-~/.local/state}/exa/usage.jsonl` (override path with 
 | Cheap bulk extraction of known URLs | **Exa contents** ($0.001, keeps links and code) → DeepSeek fetch ($0.00075, flat text) → Kagi extract ($0.004) for X/Twitter |
 | Exact match, operators, `site:` precision | **Kagi** |
 | News/freshness workflows | **Kagi** `-w news` (Exa `-c news` is the second option) |
+| Products, local businesses, events, sports, weather | **Exa** (Exa 3.0 added these to its index; plain descriptive queries, no special category) |
 | Indie/old web, anti-SEO | **Marginalia** |
 | Multi-engine corroboration | **web-research** `../web-research/scripts/meta-search.sh -e all` |
 
 ## Errors and limits
 
-- 400 → bad body, or a filter the category does not support (`company`/`people` + dates)
+- 400 → bad body, a filter the category does not support (`company`/`people` + dates), or a field `lite` does not accept (the message names it; use `-t auto`)
 - 401 → key rejected (check `~/.config/exa/api_key`)
 - 402 → out of credits (free tier resets monthly; top up at dashboard)
 - 429 → rate limit: **10 QPS** for search/answer on free and pay-as-you-go (up to 25 QPS on request); **5 QPS** for deep types. Limits apply per team, across keys.

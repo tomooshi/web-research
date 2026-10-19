@@ -20,7 +20,7 @@ This skill sits **above** four engine skills and coordinates them. The engine sk
 
 - **kagi-search** (`../kagi-search/`) — lexical + quality re-ranking (hybrid index: own + upstream commercial), $0.012/search + $0.004/extract, operator precision (site:/filetype:), news workflows, X/Twitter extraction.
 - **marginalia-search** (`../marginalia-search/`) — lexical anti-SEO, fully own index, free, **1000 queries/day hard limit**, snippets only, indie/old-web coverage nothing else has.
-- **exa-search** (`../exa-search/`) — **neural/semantic** (custom-trained embeddings over Exa's own crawl), $0.007/search (`instant` $0.004), free query-relevant highlights inside search, $0.001/contents with `maxAgeHours` freshness control, find-similar (deprecated by Exa, still works, $0.004), categories (`publication`, `company`, `people`, `news`, `personal site`, `financial report`). Free $10/mo credits.
+- **exa-search** (`../exa-search/`) — **neural/semantic** (custom-trained embeddings over Exa's own crawl), $0.007/search (`lite` $0.004, the fan-out default since Exa 3.0), free query-relevant highlights inside search, $0.001/contents with `maxAgeHours` freshness control, find-similar (deprecated by Exa, still works, $0.004), categories (`publication`, `company`, `people`, `news`, `personal site`, `financial report`). Free $10/mo credits.
 - **deepseek-search** (`../deepseek-search/`) — DeepSeek's in-house index, **$0.00075/search and /fetch, unbilled when empty or failed**. Results are passages with a long `summary`; operators include `lang:` and `after:`/`before:`; 5 QPS per account. Verified live 2026-10-18: strong for Chinese sources and date-bounded queries, weaker than Kagi for English technical queries, quality fields barely discriminate. Its fetch is live but flat text.
 
 Four engines, at least three retrieval mechanisms. When independent indexes return the same document, that is the strongest relevance vote this stack produces (verified: `-e all` with three engines yielded a triple-agreement hit and doubled the overlap count vs two engines).
@@ -38,11 +38,11 @@ Four engines, at least three retrieval mechanisms. When independent indexes retu
 ./scripts/meta-search.sh -c 20 "query"          # results per engine (deepseek caps at 50)
 ./scripts/meta-search.sh -w news "query"        # kagi workflow (kagi side only)
 ./scripts/meta-search.sh -o "user's question / goal" "query"   # deepseek ori_question + exa objective
-./scripts/meta-search.sh -i -e all "query"      # exa type instant ($0.004 instead of $0.007)
+./scripts/meta-search.sh -X auto -e all "query"  # exa type auto ($0.007) instead of lite ($0.004)
 ./scripts/meta-search.sh -s 0 "query"           # no snippet cap (default 500 chars)
 ```
 
-Cost per call: default **$0.012 + 1 Marginalia quota**. `-e all` adds **$0.007** (Exa; `-i` makes it $0.004) and **$0.00075** (DeepSeek, only if it returned results). The output's `cost` object reports what each engine charged. The Marginalia quota line passes through on stderr.
+Cost per call: default **$0.012 + 1 Marginalia quota**. `-e all` adds **$0.004** (Exa `lite`; `-X auto` makes it $0.007) and **$0.00075** (DeepSeek, only if it returned results). The output's `cost` object reports what each engine charged. The Marginalia quota line passes through on stderr.
 
 ## Engine selection (any subset of the four)
 
@@ -117,6 +117,8 @@ Triage fields (inputs to judgement, not filters):
 | `deepseek_rerank` | deepseek | 0-3, ≥1.5 = high per docs; **live: 1.9-2.4 band** |
 | `marginalia_quality` | marginalia | **lower = better** |
 | `paywalled`, `ai_generated` | kagi `props` | present only when true. `ai_generated` flags likely content-farm text |
+| `exa_relaxed` | exa | present only when true: Exa found nothing for the `site:` operator or quoted phrase and searched **without** it. The result does not satisfy the restriction unless another engine also returned it |
+| top-level `notices` | exa | Exa's notices for the model (Exa 3.0), e.g. `RESTRICTIONS_RELAXED`. Read them before you report scoped results |
 
 Snippets: Kagi and Marginalia send short snippets. DeepSeek sends a long `summary` (282-4,641 chars live; it reads like page text). Exa results carry **highlights** (query-relevant excerpts), requested by default at no extra cost (live `costDollars` unchanged, 2026-10-18). The longest snippet wins on merged results, capped by `-s`.
 
@@ -179,7 +181,7 @@ Fan-out is not the default. It spends several budgets, so route first. First que
 | "More sources like this one" (have a known-good URL) | **Exa `find-similar.sh URL`** — nothing else does this. Exa deprecated the endpoint (still works 2026-10-18); fallback: describe the page in one sentence and run `../exa-search/scripts/search.sh` on that |
 | Conceptual / descriptive query ("blog posts where practitioners argue X") | **Exa direct** (`../exa-search/scripts/search.sh`) — keyword engines mangle these |
 | Papers, companies, people as a class | **Exa `-c` category** (`publication`, `company`, `people`). For GitHub repos use Kagi `site:github.com`; for PDFs use Kagi `filetype:pdf` or `lens_id: pdf` |
-| Exact string / identifier / operator-scoped (`site:`, `filetype:`) | **Kagi direct** (DeepSeek supports `site:`/quotes too; Exa `-t keyword` is undocumented now and weaker) |
+| Exact string / identifier / operator-scoped (`site:`, `filetype:`) | **Kagi direct** (DeepSeek supports `site:`/quotes too; Exa `-t keyword` is undocumented and weaker) |
 | Chinese-language sources, or `lang:` filtering | **DeepSeek direct** with `lang:zh` (or `lang:zh,en`) |
 | Date-bounded search (`after:`/`before:`) | **DeepSeek direct** operators, or Kagi `filters`, or Exa `-a/-b` |
 | News / current events / images / videos / X | **Kagi direct** (only engine with these workflows + tweet extraction) |
@@ -194,7 +196,7 @@ Route to the next configured engine. Do not ask for the missing key.
 
 | Missing engine | Use instead |
 |---|---|
-| **Kagi** | quick facts and `site:`/quoted queries → DeepSeek direct (with `-o`) or Exa `-t instant`; news → Exa `-c news` or DeepSeek `after:`; page extraction → `fetch-page.sh` (exa/deepseek/free rungs); X/Twitter posts → `fetch-page.sh` free rungs (weak: say once that results may be thin) |
+| **Kagi** | quick facts and `site:`/quoted queries → DeepSeek direct (with `-o`) or Exa `-t lite`; news → Exa `-c news` or DeepSeek `after:`; page extraction → `fetch-page.sh` (exa/deepseek/free rungs); X/Twitter posts → `fetch-page.sh` free rungs (weak: say once that results may be thin) |
 | **Exa** | conceptual queries → DeepSeek direct with `-o "<the goal>"`, or Kagi with a keyword rephrase; find-similar → search a one-sentence description of the page; papers → Kagi `lens_id: academic` or `site:arxiv.org` |
 | **Marginalia** | indie/old web → Kagi `lens_id: small web`, or Exa `-c "personal site"`; free loops → DeepSeek (`$0.00075`) |
 | **DeepSeek** | Chinese sources → Kagi with a Chinese-language query; date bounds → Kagi `filters.after`/`before` or Exa `-a`/`-b`; cheap loops → Marginalia |
@@ -264,5 +266,6 @@ Extract figures assume the exa rung succeeds. Without an Exa key, each extract f
 - 2026-09-01: parallel execution, merge, percent-encoding dedupe (`Gemini_(protocol)` ≡ `Gemini_%28protocol%29`), overlap detection, single-engine mode.
 - 2026-10-18: canonical dedupe unit cases (arXiv abs/pdf/html/vN, DOI on doi.org/dl.acm.org, utm/fbclid, `en.m.wikipedia`, param order) merge; distinct pages stay distinct. Live Kagi + mock DeepSeek fan-out merged a UTM-tagged, no-`www` variant into Kagi's #1 result. DeepSeek scripts tested against a schema mock: retry on 429, 401/402/403/404 mapping, 128-char refusal, billing-aware ledger. Exa stale guard rejected the real stale page and passed 5 normal pages. Fixed: the Marginalia quota line never reached stderr (redirect order `2>/dev/null >&2` sent it to /dev/null).
 - 2026-10-18 API audit (Kagi spec + changelog, Exa spec v2.0.0 + pricing + live calls): Exa highlights now fill fan-out snippets at no extra cost; `-o` reaches Exa as `objective`; `-i` (instant) bills $0.004; the exa fetch rung uses `maxAgeHours`. Details live in the kagi-search and exa-search skills.
+- 2026-10-19 Exa 3.0: `lite` ($0.004, ~0.5 s) became the fan-out default after a 5-query check against `auto` (7-9 of 10 shared results, 3x faster); `-X auto` restores the old type. Exa `notices` pass through, and `RESTRICTIONS_RELAXED` marks Exa results `exa_relaxed`. Exa `warnings` print to stderr.
 - 2026-10-18 DeepSeek live: search, fetch, operators, unbilled 404s and the ledger work; findings are in the deepseek-search skill. Four-engine `-e all` ran with all engines `ok` and merged Kagi's `en-us` Azure page with two DeepSeek locale copies.
 - 2026-10-18 engine selection: simulated users with only Exa + DeepSeek keys (default became `deepseek,exa`; `-e kagi,exa` reported `kagi: skipped: no key`), with no keys (Marginalia public key + free fetch rungs; Wikipedia fetched via `curl`), and with `WEB_RESEARCH_ENGINES=kagi,deepseek`. Footer hides engines without a key or history.

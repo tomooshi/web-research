@@ -158,7 +158,7 @@ The ledger counts every call made through these scripts (agent, your own shell, 
 ## Related skills
 
 - **marginalia-search** (`../marginalia-search/`) — free indie/old-web engine (1000 queries/day). Prefer it for blog/forum/old-web discovery and SEO-spam-prone topics; it costs nothing.
-- **exa-search** (`../exa-search/`) — neural/semantic engine ($0.007/search, $0.004 with `-t instant`, $10 free monthly credits). Prefer it for conceptual queries, find-similar expansion, and cheap extraction ($0.001/page vs Kagi's $0.004 — but Kagi extract still owns X/Twitter).
+- **exa-search** (`../exa-search/`) — neural/semantic engine ($0.007/search, $0.004 with `-t lite`, $10 free monthly credits). Prefer it for conceptual queries, find-similar expansion, and cheap extraction ($0.001/page vs Kagi's $0.004 — but Kagi extract still owns X/Twitter).
 - **deepseek-search** (`../deepseek-search/`) — cheapest paid engine ($0.00075/search or fetch, empty results free). Prefer it for Chinese sources (`lang:zh`), date-bounded queries and cheap loops; its fetch is live but flat text (no links).
 - **web-research** (`../web-research/`) — coordinator: parallel four-engine fan-out (Kagi, Marginalia, Exa, DeepSeek) with canonical dedupe and rank fusion, plus `fetch-page.sh`, an extraction fallback ladder (exa → deepseek → kagi → curl → playwright → camoufox → wayback); every engine optional. Prefer it for open-ended research, and reach for `fetch-page.sh` whenever `extract-v1.sh` returns a per-URL error.
 

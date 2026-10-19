@@ -5,7 +5,7 @@ Web research skills for coding agents, built on four search engines that find th
 | Engine | How it retrieves | Good at | Cost |
 |---|---|---|---|
 | **Kagi** | keyword + quality re-ranking | precise lookups, `site:`/`filetype:`, news, X/Twitter, clean page extraction | $0.012/search, $0.004/page extract |
-| **Exa** | neural embeddings | conceptual queries, "find pages *like* this", publications/companies/people, cheap extraction | $0.007/search ($0.004 `instant`), $0.001/page ($10 free credit/month) |
+| **Exa** | neural embeddings | conceptual queries, "find pages *like* this", publications/companies/people, products and local businesses, cheap extraction | $0.004/search `lite` (fan-out default), $0.007 `auto`, $0.001/page ($10 free credit/month) |
 | **Marginalia** | keyword, anti-SEO index | personal sites, forums, old web, topics buried under SEO spam | free (1000 queries/day) |
 | **DeepSeek** | DeepSeek's in-house index | cheap search loops, Chinese sources (`lang:zh`), date-bounded queries (`after:`/`before:`) | $0.00075/search or fetch; empty results are free |
 
@@ -17,13 +17,13 @@ When two or more of these independently return the same page, that page is very 
 skills/
 ├── web-research/        coordinator: when to use which engine, research recipes
 │   └── scripts/
-│       ├── meta-search.sh   parallel fan-out, canonical-URL dedupe, rank fusion, agreement flagged
+│       ├── meta-search.sh   parallel fan-out, canonical-URL dedupe, rank fusion, agreement flagged, engine notices
 │       ├── fetch-page.sh    URL → markdown, fallback ladder: exa → deepseek → kagi → curl → playwright → camoufox → wayback
 │       ├── engines.sh       which engines this machine can use (keys, config)
 │       ├── doctor.sh        setup check (tools, keys, engine selection, optional extras)
 │       └── search-cost.sh   spend/quota summary from the local ledgers
 ├── kagi-search/         Kagi v1 search + extract
-├── exa-search/          Exa search (highlights, objective), find-similar, contents
+├── exa-search/          Exa search (lite/auto/deep, highlights, objective, notices), find-similar, contents
 ├── marginalia-search/   Marginalia search + custom filters
 └── deepseek-search/     DeepSeek search + fetch
 extensions/search-cost/  (pi only, optional) live cost footer + /search-cost command
@@ -181,7 +181,7 @@ pi footer extension only: `KAGI_COST_WARN`/`_ALERT`, `EXA_COST_WARN`/`_ALERT`, `
 
 ## Notes
 
-- API behavior noted in the SKILL.md files (response shapes, quirks, silently ignored parameters) was checked against the live APIs, most recently on 2026-10-18 (Kagi and Exa re-audited against their specs; DeepSeek tested live). Some of it will drift. If a documented flag stops working, trust what the API returns.
+- API behavior noted in the SKILL.md files (response shapes, quirks, silently ignored parameters) was checked against the live APIs, most recently on 2026-10-18 (Kagi and Exa re-audited against their specs; DeepSeek tested live) and on 2026-10-19 for Exa 3.0. Some of it will drift. If a documented flag stops working, trust what the API returns.
 - Marginalia results are CC-BY-NC-SA 4.0 on non-commercial keys.
 - `fetch-page.sh`'s browser steps are for reading public pages. Respect site terms.
 

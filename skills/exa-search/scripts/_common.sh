@@ -43,5 +43,18 @@ try:
 except Exception:
     pass' 2>/dev/null || true
 	fi
+	# Exa 3.0 (2026-10-19): /search may return `warnings` (request fields with no
+	# effect) and `notices` (how results were produced, written for the model,
+	# e.g. RESTRICTIONS_RELAXED when a site: operator matched nothing). Both stay
+	# in the JSON; one line each also goes to stderr so they are not missed.
+	printf '%s' "$body_out" | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    raise SystemExit
+for kind in ("warnings", "notices"):
+    for w in d.get(kind) or []:
+        print("exa", kind[:-1], str(w.get("code", "?")) + ":", w.get("message", ""), file=sys.stderr)' || true
 	echo "$body_out"
 }
